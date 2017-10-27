@@ -1,0 +1,20 @@
+{
+  "name": "gg-graphql",
+  "version": "0.1.0",
+  "description": "A demo graphql api for Gul og Gratis",
+  "main": "src/index.js",
+  "repository": "http://github.com/briandemant/gg-graphql",
+  "author": "Brian Demant <brian.demant@gmail.com>",
+  "license": "MIT",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "apollo-server-express": "^1.2.0",
+    "body-parser": "^1.18.2",
+    "express": "^4.16.2",
+    "graphql": "^0.11.7",
+    "graphql-tools": "^2.6.1",
+    "node-fetch": "^1.7.3"
+  }
+}

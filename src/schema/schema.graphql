@@ -1,0 +1,38 @@
+enum TransactionType {
+	SELL
+	BUY
+	FREE
+}
+
+type Category {
+	id: Int!
+	title: String!
+}
+
+type Listing {
+	id: Int!
+	title: String!
+	description: String!
+	user: User!
+	category: Category!
+	price: Int!
+	transaction_type: TransactionType!
+}
+
+type User {
+	id: Int!
+	username: String!
+}
+
+type Query {
+	category(id: Int!): Category
+	cateory_roots: [Category]
+	# --
+	listing(id: Int!): Listing
+	listing_search(query: String, category: Int): [Listing!]
+	listing_by_user(user: Int!): [Listing]
+	# --
+	user(id: Int!): User
+	# --
+	errors: [String]
+}
