@@ -10,6 +10,7 @@
     "start": "node src/index.js"
   },
   "dependencies": {
+    "@types/node": "^8.0.47",
     "apollo-server-express": "^1.2.0",
     "body-parser": "^1.18.2",
     "express": "^4.16.2",
