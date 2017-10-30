@@ -7,6 +7,13 @@ enum TransactionType {
 type Category {
 	id: Int!
 	title: String!
+	level: Int!
+	title_slug: String!
+	slug: String!
+	count: Int!
+	parents: [Category!]
+	children(with_count: Boolean): [Category]
+	can_create: Boolean
 }
 
 type Listing {
@@ -26,7 +33,7 @@ type User {
 
 type Query {
 	category(id: Int!): Category
-	cateory_roots: [Category]
+	category_roots: [Category]
 	# --
 	listing(id: Int!): Listing
 	listing_search(query: String, category: Int): [Listing!]

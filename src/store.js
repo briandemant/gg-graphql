@@ -1,81 +1,110 @@
 const fetch = require('node-fetch')
 const { promisify } = require('util')
 const fs = require('fs')
-const [readFileAsync, writeFileAsync] = [promisify(fs.readFile), promisify(fs.writeFile)]
+const zlib = require('zlib')
+const readFileAsync = promisify(fs.readFile)
+const writeFileAsync = promisify(fs.writeFile)
+const unzipAsync = promisify(zlib.unzip)
+const gzipAsync = promisify(zlib.gzip)
 
-let categoryData = {}
+let categoryCache = { ts: 0 }
 
-const UPDATE_CATEGORY_INTEVAL = 1000 * 120
+const UPDATE_ALL_CATEGORY_INTEVAL = 1000 * 60 * 60 * 24
+const UPDATE_CATEGORY_INTEVAL_PR_LVL = 1000 * 20
 
 async function loadAllCategories() {
-	let saved = {    }
-	try {
-		saved = JSON.parse(await readFileAsync("./categories.json", "utf8"))
-	} catch (e) {
+
+
+	function cacheIsStale() {
+		return (Date.now() - categoryCache.ts) > UPDATE_ALL_CATEGORY_INTEVAL
 	}
-	console.log("saved.updated", saved.updated)
 
-	let secondsSinceLastUpdate = Date.now() - (saved.ts|0)
-	console.log("secondsSinceLastUpdate", secondsSinceLastUpdate)
-	if (secondsSinceLastUpdate > UPDATE_CATEGORY_INTEVAL) {
-		console.log("loadAllCategories")
+	if (cacheIsStale()) {
+		try {
+			let content
 
-		const result = {
-			"ts": Date.now(),
-			"updated": new Date(),
-			"byId": {
-				"0": {
-					"id": 0,
-					"lvl": -1,
-					"title": "",
-					"slug": "/",
-					"parents": [],
-					"children": [],
-				},
-			},
-			"can_create": [],
+			const gzipped = await readFileAsync("./data/categories.json.gz")
+			const buffer = await unzipAsync(new Buffer(gzipped))
+			content = buffer.toString()
+
+			categoryCache = JSON.parse(content)
+			console.log("category cache loaded")
+		} catch (e) {
 		}
 
-		categoryData = await loadCategory(result)
-		await writeFileAsync("./categories.json", JSON.stringify(categoryData, null, 2))
-		console.log("Done")
+		if (cacheIsStale()) {
+			console.log("updating category cache")
+			const result = {
+				"updatedAt": new Date(),
+				"ts": 0,
+				"byId": {
+					"0": {
+						"children": [],
+					},
+				},
+				"can_create": [],
+			}
+
+			categoryCache = await loadCategory(result)
+			categoryCache.ts = Date.now()
+
+			if (!process.env.NOW) {
+				const gzipped = await gzipAsync(JSON.stringify(categoryCache, null, 2))
+				await writeFileAsync("./data/categories.json.gz", gzipped)
+			}
+			console.log("updating category cache .. Done")
+		}
 	}
+
+	let sleep = Math.max(UPDATE_ALL_CATEGORY_INTEVAL - (Date.now() - categoryCache.ts) + 100, 60 * 1000)
+
 	setTimeout(() => {
 		loadAllCategories()
-	}, UPDATE_CATEGORY_INTEVAL - secondsSinceLastUpdate + 100)
+	}, sleep)
 }
 
 async function loadSubCategories(id = 0) {
-	// console.log("loadSubCategories " + id)
+	console.log("loadSubCategories " + id)
 	const childResp = await fetch(`https://mit.guloggratis.dk/modules/gulgratis/ajax/ad_creator.fetch_categories_for_select.php?parent_categoryid=${id}`)
 	const children = (await childResp.json()).categories
-	return children.slice(0, 1)
+	return children//.slice(0, 1)
 }
 
-async function loadCategory(result, lvl = 0, id = 0) {
-	// console.log("\nloadCategory " + id, lvl)
-	try {
-		if (id > 0) {
-			const catResp = await fetch(`https://api.guloggratis.dk/modules/gg_app/category/data?id=${id}`)
-			const cat = await catResp.json()
-			delete cat.adserving_keywords
-			delete cat.facets
-			delete cat.category_fields
-			// console.log("cat", cat)
-			result["byId"][id]["title"] = cat.name
-			result["byId"][id]["count"] = cat.results
-			result["byId"][id]["slug"] = cat.GAScreenValue
+async function updateCategory(category) {
+	if (category.ts == null || Date.now() - category.ts > UPDATE_CATEGORY_INTEVAL_PR_LVL * (1 + category.level)) {
+		console.log("updating ", category.level, category.title, category.count)
 
-			if (cat.payment_category) {
-				console.log("payment", id, cat.name)
-				console.log(cat.payment_category_info_text)
+		try {
+			const catResp = await fetch(`https://mit.guloggratis.dk/modules/gg_app/category/data?id=${category.id}`)
+			const catInfo = await catResp.json()
+			const countResp = await fetch(`https://api.guloggratis.dk/modules/gg_app/search/result?category_id=${category.id}&pagenr=10000000`)
+			const count = await countResp.json()
+
+
+			category.ts = Date.now()
+			category.title = catInfo.name
+			category.count = count.nr_results
+			category.slug = catInfo.GAScreenValue
+			if (catInfo.can_create) {
+				category.can_create = true
 			}
-			if (cat.can_create) {
+		} catch (e) {
+			console.error(category, e)
+		}
+	}
+}
+
+async function loadCategory(result, level = 0, id = 0) {
+	console.log("\nloadCategory " + id, level)
+
+	try {
+		if (id > 0 && result["byId"][id]) {
+			await updateCategory(result["byId"][id])
+			if (result["byId"][id].can_create) {
 				result["can_create"].push(id)
-				result["byId"][id]["can_create"] = cat.can_create
 			}
 		}
-		// if (lvl > 2) return
+		// if (level > 2) return
 		if (!result["byId"][id]["can_create"]) {
 			const children = await loadSubCategories(id)
 			result["byId"][id]["children"] = children.map(x => x.categoryid)
@@ -84,20 +113,21 @@ async function loadCategory(result, lvl = 0, id = 0) {
 
 				result["byId"][childId] = {
 					id: childId,
-					lvl,
-					"title": child.name,
-					"count": 0,
-					"slug": "/",
-					"title_slug": child.path_as_string,
-					"parents": id > 0 ? [id, ...result["byId"][id].parents] : [],
-					"children": [],
+					ts: 0,
+					level: level,
+					title: child.name,
+					count: 0,
+					slug: result["byId"][id].slug, // inherits from parent until updated
+					title_slug: child.path_as_string,
+					parents: id > 0 ? [id, ...result["byId"][id].parents] : [],
+					children: [],
 				}
-				await loadCategory(result, lvl + 1, childId)
+				await loadCategory(result, level + 1, childId)
 			}
 		}
 
 	} catch (e) {
-		console.log(e)
+		console.error(e)
 	}
 
 	return result
@@ -105,14 +135,24 @@ async function loadCategory(result, lvl = 0, id = 0) {
 
 
 class Category {
-	find(id) {
-		if (typeof id == "number")
-			return Promise.resolve({
-				id: id,
-				title: `Category #${id.toString(16)}`,
-			})
-		else
-			return id
+	find(idOrObject) {
+		let result
+		if (typeof idOrObject == "number") {
+			result = categoryCache["byId"][idOrObject]
+		} else {
+			result = categoryCache["byId"][idOrObject.id]
+		}
+		if (!result) {
+			throw new Error(`Could not find category with id '${idOrObject}'`)
+		}
+
+		updateCategory(result)
+
+		return result
+	}
+
+	roots() {
+		return categoryCache["byId"][0].children.map(id => categoryInstance.find(id))
 	}
 }
 
@@ -153,9 +193,12 @@ class User {
 	}
 }
 
+const categoryInstance = new Category()
+const ListingInstance = new Listing()
+const userInstance = new User()
+
 module.exports = async () => {
 	loadAllCategories()
-
 
 	return await Promise.resolve({
 		Category: new Category(),
