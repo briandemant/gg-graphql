@@ -1,21 +1,36 @@
 {
-  "name": "gg-graphql",
-  "version": "0.1.0",
-  "description": "A demo graphql api for Gul og Gratis",
-  "main": "src/index.js",
-  "repository": "http://github.com/briandemant/gg-graphql",
-  "author": "Brian Demant <brian.demant@gmail.com>",
-  "license": "MIT",
-  "scripts": {
-    "start": "node src/index.js"
-  },
-  "dependencies": {
-    "@types/node": "^8.0.47",
-    "apollo-server-express": "^1.2.0",
-    "body-parser": "^1.18.2",
-    "express": "^4.16.2",
-    "graphql": "^0.11.7",
-    "graphql-tools": "^2.6.1",
-    "node-fetch": "^1.7.3"
-  }
+	"name": "gg-graphql",
+	"version": "0.1.0",
+	"description": "A demo graphql api for Gul og Gratis",
+	"main": "src/index.js",
+	"repository": "http://github.com/briandemant/gg-graphql",
+	"author": "Brian Demant <brian.demant@gmail.com>",
+	"license": "MIT",
+	"scripts": {
+		"start": "node src/index.js",
+		"build": "rm -rf build/* && tsc --pretty",
+		"clean": "rm -rf build/*",
+		"dev": "tsc -w --pretty & (sleep 5 && nodemon -d 1 -w build build/index.js)"
+	},
+	"dependencies": {
+		"@types/lodash": "^4.14.80",
+		"@types/zen-observable": "^0.5.3",
+		"apollo-link": "^1.0.0",
+		"apollo-server-express": "^1.2.0",
+		"body-parser": "^1.18.2",
+		"express": "^4.16.2",
+		"graphql": "^0.11.7",
+		"graphql-tools": "^2.6.1",
+		"lodash": "^4.17.4",
+		"node-fetch": "^1.7.3"
+	},
+	"devDependencies": {
+		"@types/express": "^4.0.39",
+		"@types/graphql": "^0.11.5",
+		"@types/node": "^8.0.47",
+		"@types/node-fetch": "^1.6.7",
+		"nodemon": "^1.12.1",
+		"tslint": "^5.8.0",
+		"typescript": "^2.5.3"
+	}
 }

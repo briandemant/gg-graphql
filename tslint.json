@@ -1,0 +1,4 @@
+{
+	"extends": ["./tslint.shared.json"],
+	"rules": {}
+}

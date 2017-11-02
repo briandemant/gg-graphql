@@ -1,0 +1,44 @@
+{
+  "compilerOptions": {
+	"outDir": "build",
+	"module": "UMD",
+	"target": "es6",
+	"lib": [
+	  "es5",
+	  "es6",
+	  "dom",
+	  "es2015.core",
+	  "es2015.collection",
+	  "es2015.generator",
+	  "es2015.iterable",
+	  "es2015.promise",
+	  "es2015.proxy",
+	  "es2015.reflect",
+	  "es2015.symbol",
+	  "es2015.symbol.wellknown",
+	  "esnext.asynciterable"
+	],
+	"sourceMap": true,
+	"moduleResolution": "node",
+	"rootDir": "src",
+	"forceConsistentCasingInFileNames": true,
+	"noImplicitReturns": true,
+	"noImplicitThis": true,
+	"noImplicitAny": true,
+	"noResolve": false,
+	"strictNullChecks": true,
+	"suppressImplicitAnyIndexErrors": true,
+	"noUnusedLocals": true,
+	"allowSyntheticDefaultImports": true
+  },
+  "include": [
+	"./src/**/*.ts",
+	"./src/**/*.tsx"
+  ],
+  "exclude": [
+	"node_modules",
+	"build",
+	"scripts",
+	"**/*.test.tsx"
+  ]
+}

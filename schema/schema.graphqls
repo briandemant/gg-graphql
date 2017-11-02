@@ -11,6 +11,7 @@ type Category {
 	title_slug: String!
 	slug: String!
 	count: Int!
+	parent: Category
 	parents: [Category!]
 	children(with_count: Boolean): [Category]
 	can_create: Boolean
@@ -20,15 +21,22 @@ type Listing {
 	id: Int!
 	title: String!
 	description: String!
+	phone: String!
 	user: User!
 	category: Category!
 	price: Int!
 	transaction_type: TransactionType!
 }
 
+type ListingList {
+	count:Int!
+	listings:[Listing!]
+}
+
 type User {
 	id: Int!
 	username: String!
+	phone: String!
 }
 
 type Query {
@@ -36,8 +44,8 @@ type Query {
 	category_roots: [Category]
 	# --
 	listing(id: Int!): Listing
-	listing_search(query: String, category: Int): [Listing!]
-	listing_by_user(user: Int!): [Listing]
+	listing_latest(category: Int,limit :Int): ListingList
+	listing_search(query: String, category: Int,user: Int,limit :Int):ListingList
 	# --
 	user(id: Int!): User
 	# --
