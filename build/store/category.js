@@ -39,7 +39,7 @@ function refreshItemFn(category, ageInSeconds) {
             });
             category.count = count.nr_results;
             if (ageInSeconds < 60 * 60 || ageInSeconds === 0) {
-                console.log(">>only update count");
+                // console.log(">>only update count")
                 return category;
             }
             else {

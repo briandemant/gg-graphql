@@ -62,7 +62,7 @@ class ListingRepo {
         return __awaiter(this, void 0, void 0, function* () {
             let memoize = cache.memoize("latest", { limit: limit, category: category }, {
                 ttl: 30,
-                stale: 600,
+                stale: 60 * 60,
                 autoUpdate: 10,
             }, (params) => __awaiter(this, void 0, void 0, function* () {
                 const data = yield fetch_1.fetchJson(`https://api.guloggratis.dk/modules/gg_front/latest_items`, {
@@ -85,10 +85,13 @@ class ListingRepo {
     }
     static search(query, category, user, limit = 20) {
         return __awaiter(this, void 0, void 0, function* () {
-            let memoize = cache.memoize("search", { query, limit, user, category }, {
+            query = typeof query === "undefined" ? "" : query;
+            category = typeof category === "undefined" ? 0 : category;
+            user = typeof user === "undefined" ? 0 : user;
+            let memoize = cache.memoize("search", { query, user, category }, {
                 ttl: 30,
-                stale: 60,
-                autoUpdate: 1,
+                stale: 60 * 60,
+                autoUpdate: 3,
             }, (params) => __awaiter(this, void 0, void 0, function* () {
                 let url = `https://api.guloggratis.dk/modules/gg_app/search/result`;
                 let query = {
@@ -99,12 +102,12 @@ class ListingRepo {
                 const data = yield fetch_1.fetchJson(url, query);
                 return {
                     count: data.nr_results,
-                    listings: data.results.slice(0, limit).map((listing) => listing.id),
+                    listings: data.results.map((listing) => listing.id),
                 };
             }));
             return memoize.then((result) => __awaiter(this, void 0, void 0, function* () {
                 const listings = [];
-                for (let id of result.listings) {
+                for (let id of result.listings.slice(0, limit)) {
                     let item = yield ListingRepo.find(id);
                     if (item) {
                         listings.push(item);

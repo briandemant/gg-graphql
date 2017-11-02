@@ -67,7 +67,7 @@ export class ListingRepo {
 	static async findLatest(category?: number, limit: number = 20): Promise<{ count: number, listings: Listing[] }> {
 		let memoize = cache.memoize<number[]>("latest", { limit: limit, category: category }, {
 			ttl: 30,
-			stale: 600,
+			stale: 60 * 60,
 			autoUpdate: 10,
 		}, async (params) => {
 
@@ -93,10 +93,15 @@ export class ListingRepo {
 
 
 	static async search(query: string, category: number, user: number, limit: number = 20): Promise<{ count: number, listings: Listing[] }> {
-		let memoize = cache.memoize<{ count: number, listings: number[] }>("search", { query, limit, user, category }, {
+
+		query = typeof query === "undefined" ? "" : query
+		category = typeof category === "undefined" ? 0 : category
+		user = typeof user === "undefined" ? 0 : user
+
+		let memoize = cache.memoize<{ count: number, listings: number[] }>("search", { query, user, category }, {
 			ttl: 30,
-			stale: 60,
-			autoUpdate: 1,
+			stale: 60 * 60,
+			autoUpdate: 3,
 		}, async (params) => {
 			let url = `https://api.guloggratis.dk/modules/gg_app/search/result`
 			let query = {
@@ -108,13 +113,13 @@ export class ListingRepo {
 
 			return {
 				count: data.nr_results,
-				listings: data.results.slice(0, limit).map((listing: { id: number }) => listing.id),
+				listings: data.results.map((listing: { id: number }) => listing.id),
 			}
 		})
 
 		return memoize.then(async (result: { count: number, listings: number[] }) => {
 			const listings: Listing[] = []
-			for (let id of result.listings) {
+			for (let id of result.listings.slice(0, limit)) {
 				let item = await  ListingRepo.find(id)
 				if (item) {
 					listings.push(item)

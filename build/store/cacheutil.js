@@ -17,8 +17,6 @@ const unzipAsync = promisify(zlib.unzip);
 const gzipAsync = promisify(zlib.gzip);
 const MAX_AUTO_UPDATES = 10;
 const useZip = process.env.ENV !== "develop";
-console.log("useZip", useZip);
-process.exit();
 function loadFromDisk(name) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -89,37 +87,13 @@ class CacheUtil {
             }
         });
     }
-    updateOrClearMemoize() {
-        return __awaiter(this, void 0, void 0, function* () {
-            // console.log(Object.keys(this.cache.memoize))
-            this.cache.memoize = this.cache.memoize || {};
-            for (let key of Object.keys(this.cache.memoize)) {
-                const info = this.cache.memoize[key];
-                const lifetime = info.options.ttl * 2;
-                if (Date.now() - info.ts > lifetime * 1000) {
-                    info.options.autoUpdate = Math.min(info.options.autoUpdate - 1, MAX_AUTO_UPDATES);
-                    info.options.autoUpdate = info.options.autoUpdate - 1;
-                    // console.log(key, info.options, info.fn)
-                    if (info.options.autoUpdate > 0 && info.fn) {
-                        this.memoize(info.name, info.params, info.options, info.fn);
-                    }
-                    else {
-                        delete this.cache.memoize[key];
-                    }
-                }
-            }
-            setTimeout(() => {
-                this.updateOrClearMemoize().catch((err) => console.error(err));
-            }, waitWithJitter(2));
-        });
-    }
     autoRefreshItems() {
         return __awaiter(this, void 0, void 0, function* () {
             // console.log(`autoRefreshItems ${ this.name}`)
             for (let item of this.all()) {
                 if (this.isItemStale(item.id)) {
                     let ageInSeconds = this.getAgeInSeconds(item.id);
-                    console.log(this.name, item.id, item.title || item.username, ageInSeconds);
+                    // console.log(this.name, item.id, (item as any).title || (item as any).username, ageInSeconds)
                     const updated = yield this.refreshItemFn(item, ageInSeconds);
                     // console.log("updated",updated)
                     if (updated && (updated != item || item.hasChanged)) {
@@ -175,36 +149,67 @@ class CacheUtil {
         let age = this.getAgeInSeconds(id);
         return age > maxAgeWithJitter;
     }
+    updateOrClearMemoize() {
+        return __awaiter(this, void 0, void 0, function* () {
+            // console.log(Object.keys(this.cache.memoize))
+            this.cache.memoize = this.cache.memoize || {};
+            for (let key of Object.keys(this.cache.memoize)) {
+                const info = this.cache.memoize[key];
+                info.options.autoUpdate = Math.min(info.options.autoUpdate | 0, MAX_AUTO_UPDATES);
+                const ageInSeconds = (Date.now() - info.ts) / 1000 | 0;
+                const stale = info.options.stale ? info.options.stale : info.options.ttl;
+                const wait = info.options.ttl + (stale - info.options.ttl) / (info.options.autoUpdate + 1);
+                // console.log("wait",wait)
+                if (ageInSeconds > wait) {
+                    // console.log(key, info.options, info.fn)
+                    if (info.options.autoUpdate > 0 && info.fn) {
+                        // console.log("UPDATE ", info.options.autoUpdate)
+                        info.options.autoUpdate = info.options.autoUpdate - 1;
+                        this.memoize(info.name, info.params, info.options, info.fn);
+                    }
+                    else if (info.options.stale && (ageInSeconds < info.options.stale)) {
+                        // console.log("STALE BUT KEEP")
+                    }
+                    else {
+                        // console.log("REMOVING")
+                        delete this.cache.memoize[key];
+                    }
+                }
+            }
+            setTimeout(() => {
+                this.updateOrClearMemoize().catch((err) => console.error(err));
+            }, waitWithJitter(4));
+        });
+    }
     memoize(name, params, options, fn) {
         return __awaiter(this, void 0, void 0, function* () {
             const key = `${name}::${JSON.stringify(params)}`;
             this.cache.memoize = this.cache.memoize || {};
             let result = this.cache.memoize[key];
             if (result && Date.now() < result.ts + options.ttl * 1000) {
-                console.log("ttl ok");
+                // console.log("ttl ok")
                 return result.value;
             }
+            console.log("FETCHING", name, params);
             this.runningPromises[key] = this.runningPromises[key] || fn(params).then((value) => {
                 delete this.runningPromises[key];
                 // console.log("REFRESHING CACHE .. done")
-                Promise.all(value).then((x) => {
-                    this.cache.memoize[key] = {
-                        ts: Date.now(),
-                        name: name,
-                        params: params,
-                        options: options,
-                        fn: fn,
-                        value: x,
-                    };
-                });
+                this.cache.memoize[key] = {
+                    ts: Date.now(),
+                    name: name,
+                    params: params,
+                    options: options,
+                    fn: fn,
+                    value: value,
+                };
                 return value;
             });
             if (result && options.stale && Date.now() < result.ts + options.stale * 1000) {
-                console.log("stale ok");
+                // console.log("stale ok")
                 return result.value;
             }
             else {
-                console.log("need update");
+                // console.log("need update")
                 return this.runningPromises[key];
             }
         });
