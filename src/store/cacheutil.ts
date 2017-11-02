@@ -120,7 +120,7 @@ export class CacheUtil<CacheType extends Model> {
 
 			if (this.isItemStale(item.id)) {
 				let ageInSeconds = this.getAgeInSeconds(item.id)
-				console.log(this.name, item.id, (item as any).title || (item as any).username, ageInSeconds)
+				// console.log(this.name, item.id, (item as any).title || (item as any).username, ageInSeconds)
 				const updated = await this.refreshItemFn(item, ageInSeconds)
 				// console.log("updated",updated)
 

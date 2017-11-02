@@ -46,7 +46,7 @@ async function refreshItemFn(category: Category | number, ageInSeconds: number):
 		category.count = count.nr_results
 
 		if (ageInSeconds < 60 * 60 || ageInSeconds === 0) {
-			console.log(">>only update count")
+			// console.log(">>only update count")
 			return category
 		} else {
 			const catInfo = await fetchJson(`https://api.guloggratis.dk/modules/gg_app/category/data`, { id })
