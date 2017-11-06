@@ -23,7 +23,8 @@ export interface Listing extends Model {
 }
 
 async function refreshItemFn(item: Listing | number, ageInSeconds: number): Promise<Listing | null> {
-	// if (ageInSeconds < 5 * 60) return null
+	if (ageInSeconds < 60 * 60) return null
+
 	let id
 	if (typeof item === 'string') {
 		item = parseInt(item)
@@ -50,7 +51,7 @@ async function refreshItemFn(item: Listing | number, ageInSeconds: number): Prom
 	}
 
 	if (typeof id == "undefined") {
-		console.log("item",item)
+		console.log("item", item)
 		return null
 	}
 
@@ -65,11 +66,11 @@ async function refreshItemFn(item: Listing | number, ageInSeconds: number): Prom
 			}).trim() : ""
 
 			UserRepo.saveToCache({
-				id: data.userid,
-				username: data.username.trim(),
-				phone: phone,
-				nemid_validated: data.user_nem_id_validate,
-			})
+				                     id: data.userid,
+				                     username: data.username.trim(),
+				                     phone: phone,
+				                     nemid_validated: data.user_nem_id_validate,
+			                     })
 
 		} catch (e) {
 			console.log(data)
@@ -110,14 +111,14 @@ async function refreshItemFn(item: Listing | number, ageInSeconds: number): Prom
 			}
 		}
 
-		let images: number[] = flatten(data.sorted_images.map(Object.keys)).map((x:string) => parseInt(x))
+		let images: number[] = flatten(data.sorted_images.map(Object.keys)).map((x: string) => parseInt(x))
 
 		return {
 			id: id,
 			title: data.headline,
 			phone: phone,
 			description: data.descriptionForEditing,
-			price: data.price_value * 100,
+			price: Math.min(2147483600, data.price_value * 100),
 			user: data.userid,
 			category: data.categoryid,
 			transaction_type: transaction_type,
@@ -154,7 +155,7 @@ export class ListingRepo {
 		}, async (params) => {
 
 			const data = await fetchJson(`https://api.guloggratis.dk/modules/gg_front/latest_items`, {
-				number: params.limit,
+				number: 100,
 				category_id: params.category,
 			})
 			return data.map((listing: { adid: number }) => listing.adid as number)
@@ -163,7 +164,7 @@ export class ListingRepo {
 
 		return memoize.then(async (list: number[]) => {
 			const results: Listing[] = []
-			for (let id of list) {
+			for (let id of list.slice(0, limit)) {
 				let item = await ListingRepo.find(id)
 				if (item) {
 					results.push(item)

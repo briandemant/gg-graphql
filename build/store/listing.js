@@ -14,8 +14,12 @@ const cacheutil_1 = require("./cacheutil");
 const lodash_1 = require("lodash");
 function refreshItemFn(item, ageInSeconds) {
     return __awaiter(this, void 0, void 0, function* () {
-        // if (ageInSeconds < 5 * 60) return null
+        if (ageInSeconds < 60 * 60)
+            return null;
         let id;
+        if (typeof item === 'string') {
+            item = parseInt(item);
+        }
         if (typeof item === 'number') {
             id = item;
             item = {
@@ -36,6 +40,10 @@ function refreshItemFn(item, ageInSeconds) {
         }
         else {
             id = item.id;
+        }
+        if (typeof id == "undefined") {
+            console.log("item", item);
+            return null;
         }
         const data = yield fetch_1.fetchJson(`https://api.guloggratis.dk/modules/gg_app/ad/view`, { id });
         // console.log(data)
@@ -95,7 +103,7 @@ function refreshItemFn(item, ageInSeconds) {
                 title: data.headline,
                 phone: phone,
                 description: data.descriptionForEditing,
-                price: data.price_value * 100,
+                price: Math.min(2147483600, data.price_value * 100),
                 user: data.userid,
                 category: data.categoryid,
                 transaction_type: transaction_type,
@@ -130,14 +138,14 @@ class ListingRepo {
                 autoUpdate: 10,
             }, (params) => __awaiter(this, void 0, void 0, function* () {
                 const data = yield fetch_1.fetchJson(`https://api.guloggratis.dk/modules/gg_front/latest_items`, {
-                    number: params.limit,
+                    number: 100,
                     category_id: params.category,
                 });
                 return data.map((listing) => listing.adid);
             }));
             return memoize.then((list) => __awaiter(this, void 0, void 0, function* () {
                 const results = [];
-                for (let id of list) {
+                for (let id of list.slice(0, limit)) {
                     let item = yield ListingRepo.find(id);
                     if (item) {
                         results.push(item);
