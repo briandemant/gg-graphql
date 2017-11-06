@@ -1,5 +1,5 @@
 import { fetchJson } from "../fetch"
-import { difference, uniq } from "lodash"
+import { difference } from "lodash"
 import { Model } from "./model"
 import { CacheUtil, makeCache } from "./cacheutil"
 
@@ -36,6 +36,12 @@ async function refreshItemFn(category: Category | number, ageInSeconds: number):
 		id = category.id
 	}
 
+	category.level = category.parents.length
+	if (ageInSeconds < 60) {
+		return null
+	}
+	// else if (ageInSeconds>46)
+	// throw new Error("ageInSeconds")
 	// console.log("category", id, category.title_slug)
 	try {
 		const count = await fetchJson(`https://api.guloggratis.dk/modules/gg_app/search/result`, {
@@ -45,7 +51,7 @@ async function refreshItemFn(category: Category | number, ageInSeconds: number):
 
 		category.count = count.nr_results
 
-		if (ageInSeconds < 60 * 60 || ageInSeconds === 0) {
+		if (ageInSeconds < 2 * 60 * 60 || ageInSeconds === 0) {
 			// console.log(">>only update count")
 			return category
 		} else {
@@ -78,12 +84,12 @@ async function refreshItemFn(category: Category | number, ageInSeconds: number):
 			}
 
 			for (let childId of category.children) {
-				const child = await CategoryRepo.find(childId)
+				const child = await cache.get(childId, false)
 				if (category.id > 0 && child) {
 					if (category.parents.length > 0) {
 						child.title_slug = `${category.title_slug}/${child.title}`
 						child.parents = [category.id, ...category.parents].filter(x => x > 0)
-						child.level = child.parents.length + 1
+						child.level = child.parents.length
 					} else {
 						child.level = 0
 						child.title_slug = `${category.title}/${child.title}`
@@ -92,7 +98,6 @@ async function refreshItemFn(category: Category | number, ageInSeconds: number):
 				}
 			}
 
-			(category as any).hasChanged = true
 			return category
 		}
 	} catch (e) {
@@ -115,35 +120,21 @@ async function removeChildren(children: number[]) {
 let cache: CacheUtil<Category>
 
 async function rebuildTree() {
-	CategoryRepo.roots().catch((err) => console.log(err))
+	// CategoryRepo.roots().catch((err) => console.log(err))
+	// cache.get(373).catch((err) => console.log(err))
+	// cache.get(374).catch((err) => console.log(err))
 }
 
-
-async function updateCounts() {
-	let processQueue = uniq(updateQueue)
-	for (const id of processQueue) {
-		if (cache.getAgeInSeconds(id) > 60 * 1000) {
-			await refreshItemFn(id, cache.getAgeInSeconds(id))
-		}
-	}
-	updateQueue = difference(processQueue, updateQueue)
-
-	setTimeout(() => {updateCounts().catch((err) => console.log(err))}, 10000)
-}
 
 (async () => {
-	cache = await makeCache<Category>("category", refreshItemFn, 24 * 60 * 60)
+	cache = await makeCache<Category>("category", refreshItemFn, 2 * 24 * 60 * 60)
 
 	rebuildTree().catch((err) => console.log(err))
-	updateCounts().catch((err) => console.log(err))
 })()
-
-let updateQueue: number[] = []
 
 
 export class CategoryRepo {
 	static async find(id: number): Promise<Category | null> {
-		updateQueue.push(id)
 		return cache.get(id)
 	}
 

@@ -1,0 +1,16 @@
+{
+  "name": "gg-graphql-demo",
+  "alias": "gg-graphql-demo",
+  "type": "npm",
+  "files": [
+	"build",
+	"src",
+	"schema/*.graphqls",
+	"data/*.gz",
+	"packages*.json",
+	"ts*.json"
+  ],
+  "env": {
+	"NODE_ENV": "production"
+  }
+}

@@ -31,6 +31,12 @@ function refreshItemFn(category, ageInSeconds) {
         else {
             id = category.id;
         }
+        category.level = category.parents.length;
+        if (ageInSeconds < 60) {
+            return null;
+        }
+        // else if (ageInSeconds>46)
+        // throw new Error("ageInSeconds")
         // console.log("category", id, category.title_slug)
         try {
             const count = yield fetch_1.fetchJson(`https://api.guloggratis.dk/modules/gg_app/search/result`, {
@@ -38,7 +44,7 @@ function refreshItemFn(category, ageInSeconds) {
                 pagenr: 100000,
             });
             category.count = count.nr_results;
-            if (ageInSeconds < 60 * 60 || ageInSeconds === 0) {
+            if (ageInSeconds < 2 * 60 * 60 || ageInSeconds === 0) {
                 // console.log(">>only update count")
                 return category;
             }
@@ -68,12 +74,12 @@ function refreshItemFn(category, ageInSeconds) {
                     category.can_create = true;
                 }
                 for (let childId of category.children) {
-                    const child = yield CategoryRepo.find(childId);
+                    const child = yield cache.get(childId, false);
                     if (category.id > 0 && child) {
                         if (category.parents.length > 0) {
                             child.title_slug = `${category.title_slug}/${child.title}`;
                             child.parents = [category.id, ...category.parents].filter(x => x > 0);
-                            child.level = child.parents.length + 1;
+                            child.level = child.parents.length;
                         }
                         else {
                             child.level = 0;
@@ -82,7 +88,6 @@ function refreshItemFn(category, ageInSeconds) {
                         }
                     }
                 }
-                category.hasChanged = true;
                 return category;
             }
         }
@@ -107,31 +112,18 @@ function removeChildren(children) {
 let cache;
 function rebuildTree() {
     return __awaiter(this, void 0, void 0, function* () {
-        CategoryRepo.roots().catch((err) => console.log(err));
-    });
-}
-function updateCounts() {
-    return __awaiter(this, void 0, void 0, function* () {
-        let processQueue = lodash_1.uniq(updateQueue);
-        for (const id of processQueue) {
-            if (cache.getAgeInSeconds(id) > 60 * 1000) {
-                yield refreshItemFn(id, cache.getAgeInSeconds(id));
-            }
-        }
-        updateQueue = lodash_1.difference(processQueue, updateQueue);
-        setTimeout(() => { updateCounts().catch((err) => console.log(err)); }, 10000);
+        // CategoryRepo.roots().catch((err) => console.log(err))
+        // cache.get(373).catch((err) => console.log(err))
+        // cache.get(374).catch((err) => console.log(err))
     });
 }
 (() => __awaiter(this, void 0, void 0, function* () {
-    cache = yield cacheutil_1.makeCache("category", refreshItemFn, 24 * 60 * 60);
+    cache = yield cacheutil_1.makeCache("category", refreshItemFn, 2 * 24 * 60 * 60);
     rebuildTree().catch((err) => console.log(err));
-    updateCounts().catch((err) => console.log(err));
 }))();
-let updateQueue = [];
 class CategoryRepo {
     static find(id) {
         return __awaiter(this, void 0, void 0, function* () {
-            updateQueue.push(id);
             return cache.get(id);
         });
     }

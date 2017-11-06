@@ -1,7 +1,19 @@
 enum TransactionType {
 	SELL
 	BUY
-	FREE
+	GIVEAWAY
+	OTHER
+	RENT_OUT
+	TO_RENT
+	UNKNOWN
+}
+
+enum ImageSizeType {
+	ORIGINAL
+	HUGE
+	BIG
+	NORMAL
+	SMALL
 }
 
 type Category {
@@ -21,25 +33,49 @@ type Listing {
 	id: Int!
 	title: String!
 	description: String!
-	phone: String!
-	user: User!
-	category: Category!
 	price: Int!
 	transaction_type: TransactionType!
+	user: User!
+	category: Category!
+	images(size:ImageSizeType):[Image!]
+	phone: String!
+	address: String
+	zipcode: String
+	city: String
+	country: String
+	extra : ListingExtra
+}
+
+type ListingExtra {
+	related_listings: [Listing!]
 }
 
 type ListingList {
 	count:Int!
-	listings:[Listing!]
+	results:[Listing!]
 }
 
 type User {
 	id: Int!
 	username: String!
 	phone: String!
+	extra : UserExtra
+}
+
+type UserExtra {
+	listings : [Listing!]
+}
+
+type Image {
+	id: Int!
+	url: String!
+	size: ImageSizeType
+	width: Int!
+	height: Int!
 }
 
 type Query {
+	# lookup one category
 	category(id: Int!): Category
 	category_roots: [Category]
 	# --
@@ -48,6 +84,8 @@ type Query {
 	listing_search(query: String, category: Int,user: Int,limit :Int):ListingList
 	# --
 	user(id: Int!): User
+	# --
+	image(id: Int!,size:ImageSizeType): Image
 	# --
 	errors: [String]
 }

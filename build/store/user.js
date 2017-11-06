@@ -11,13 +11,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const fake_1 = require("./fake");
 const cacheutil_1 = require("./cacheutil");
 function fakeUser(id) {
-    return { id, username: fake_1.default.username(id), phone: fake_1.default.phone(id) };
+    return { id, username: fake_1.default.username(id), phone: fake_1.default.phone(id), nemid_validated: false };
 }
 function refreshItemFn(user, ageInSeconds) {
     return __awaiter(this, void 0, void 0, function* () {
         if (typeof user === "number")
             return fakeUser(user);
-        return user;
+        return null;
     });
 }
 let cache;

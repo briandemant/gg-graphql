@@ -16,7 +16,7 @@ function fetchJson(url, params) {
             .join('&');
         // console.log(url + "?" + query)
         const response = yield node_fetch_1.default(url + "?" + query);
-        return yield response.json();
+        return response.json();
     });
 }
 exports.fetchJson = fetchJson;

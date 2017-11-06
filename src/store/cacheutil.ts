@@ -1,3 +1,5 @@
+import { difference, uniq } from "lodash"
+
 const { promisify } = require('util')
 const fs = require('fs')
 const zlib = require('zlib')
@@ -19,6 +21,10 @@ interface CacheRoot {
 }
 
 const useZip = process.env.ENV !== "develop"
+
+function to_human_debug(item: any) {
+	return typeof  item.item.title !== "undefined" ? item.item.title : item.item.username
+}
 
 
 async function loadFromDisk(name: string): Promise<CacheRoot> {
@@ -52,17 +58,22 @@ async function saveToDisk(name: string, cache: CacheRoot) {
 		const gzipped = await gzipAsync(JSON.stringify(cache))
 		await writeFileAsync(`./data/${name}.json.gz`, gzipped)
 		cache.hasChanged = false
-		// console.log(`saved ${name} cache`)
+		// console.log(`\n\nsaved ${name} cache\n\n`)
 	}
 }
 
-function waitWithJitter(wait: number) {
-	return wait * 1000 * (0.8 + 0.3 * Math.random()) | 0
+function waitWithJitter(waitInSeconds: number) {
+	return addJitter(waitInSeconds) * 1000
+}
+
+function addJitter(waitInSeconds: number) {
+	return waitInSeconds * (0.8 + 0.3 * Math.random()) | 0
 }
 
 export class CacheUtil<CacheType extends Model> {
 	private cache: CacheRoot
 	private runningPromises = {}
+	private updateQueue: number[] = []
 
 	constructor(private name: string,
 	            private refreshItemFn: (item: CacheType | number, ageInSeconds: number) => Promise<Model | null>,
@@ -76,6 +87,7 @@ export class CacheUtil<CacheType extends Model> {
 			this.autoRefreshItems().catch((err) => console.error(err))
 			this.saveCache().catch((err) => console.error(err))
 			this.updateOrClearMemoize().catch((err) => console.error(err))
+			this.processUpdateQueue().catch((err) => console.error(err))
 		}, 1000)
 	}
 
@@ -96,23 +108,18 @@ export class CacheUtil<CacheType extends Model> {
 		// console.log(`autoRefreshItems ${ this.name}`)
 
 		for (let item of this.all()) {
+			// console.log(this.name, "item.id", item.id, this.getAgeInSeconds(item.id))
 
-			if (this.isItemStale(item.id)) {
-				let ageInSeconds = this.getAgeInSeconds(item.id)
-				// console.log(this.name, item.id, (item as any).title || (item as any).username, ageInSeconds)
-				const updated = await this.refreshItemFn(item, ageInSeconds)
-				// console.log("updated",updated)
-
-				if (updated && (updated != item || (item as any).hasChanged)) {
-					const ts = Date.now()
-					delete (item as any).hasChanged
-					this.cache.byId[item.id] = { ts, item: updated }
-					this.cache.hasChanged = true
-				}
+			if (typeof item.id === "undefined") {
+				delete this.cache.byId[item.id]
+			} else if (this.isItemStale(item.id)) {
+				// add to end of queue (low pri)
+				this.scheduleUpdate(item.id, "low")
 			}
 		}
-		let sleep = waitWithJitter(Math.max(this.refreshItemRateInSeconds / 100, 2))
-		// console.log("SLEEP ", sleep, this.name, this.refreshItemRateInSeconds)
+		let between = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
+		let sleep = waitWithJitter(between(this.refreshItemRateInSeconds / 60, 60, 60 * 60))
+		// console.log("SLEEP ", sleep, this.name)
 
 		setTimeout(() => {
 			this.autoRefreshItems().catch((err) => console.error(err))
@@ -120,12 +127,14 @@ export class CacheUtil<CacheType extends Model> {
 	}
 
 	public getAgeInSeconds(id: number) {
-		return (Date.now() - this.cache.byId[id].ts) / 1000 | 0
+		const item = this.cache.byId[id]
+		return item ? (Date.now() - item.ts) / 1000 | 0 : Infinity
 	}
 
-	public async get(id: number): Promise<CacheType | null> {
+	public async get(id: number, scheduleUpdate: boolean = true): Promise<CacheType | null> {
 		const cached = this.cache.byId[id]
 		if (typeof cached !== 'undefined') {
+			if (scheduleUpdate) this.scheduleUpdate(id)
 			return cached.item
 		}
 		return this.refreshItemFn(id, Infinity).then((item: CacheType | null) => item ? this.update(item) : item)
@@ -142,6 +151,15 @@ export class CacheUtil<CacheType extends Model> {
 		return limit == 0 ? all : all.slice(0, limit)
 	}
 
+	public scheduleUpdate(id: number, priority: "high" | "low" = "high") {
+		// add to start of queue (high pri)
+		// console.log("scheduleUpdate", this.name, id, this.getAgeInSeconds(id))
+		if (priority === "high") {
+			this.updateQueue.unshift(id)
+		} else {
+			this.updateQueue.push(id)
+		}
+	}
 
 	public update(item: CacheType): CacheType {
 		this.cache.hasChanged = true
@@ -158,26 +176,72 @@ export class CacheUtil<CacheType extends Model> {
 		if (!this.cache.byId[id].ts) return true
 
 		// add jitter to avoid all items are invalidated at the same time
-		let maxAgeWithJitter = waitWithJitter(this.refreshItemRateInSeconds)
+		let maxAgeWithJitter = addJitter(this.refreshItemRateInSeconds)
 
 		let age = this.getAgeInSeconds(id)
 
 		return age > maxAgeWithJitter
-
 	}
 
+
+	private async processUpdateQueue() {
+		const BATCH_TIME = 5 * 1000
+		// if (this.name != "category") {
+		// 	return
+		// }
+		// console.log("START processUpdateQueue")
+
+		let processQueue = uniq(this.updateQueue)
+		if (processQueue.length > 0) {
+			console.log("processUpdateQueue", this.name, processQueue.length)
+
+			const started = Date.now()
+			let processed: number[] = []
+			for (const id of processQueue) {
+				let ageInSeconds = this.getAgeInSeconds(id)
+
+				const item = this.cache.byId[id] ? this.cache.byId[id] : id
+				if (typeof item === "undefined") {
+					delete this.cache.byId[id]
+					continue
+				}
+				console.log("updating", this.name, id, to_human_debug(item), ((ageInSeconds / 60 | 0) / 60 * 100 | 0) / 100 + "h")
+				const updated = await this.refreshItemFn(item.item, waitWithJitter(ageInSeconds) / 1000)
+
+				if (updated) {
+					const ts = Date.now()
+					delete (updated as any).hasChanged
+
+					this.cache.byId[id] = { ts, item: updated }
+					this.cache.hasChanged = true
+				}
+				processed.push(id)
+				if (Date.now() - started > BATCH_TIME) break
+			}
+			this.updateQueue = difference(uniq(this.updateQueue), processed)
+
+			console.log("processed         ", this.name, processed.length)
+			console.log("after             ", this.name, this.updateQueue.length)
+		}
+
+		setTimeout(() => {
+			// console.log("AGAIN", this.name, this.updateQueue.length)
+
+			this.processUpdateQueue().catch((err) => console.log(err))
+		}, waitWithJitter(1))
+	}
 
 	private async updateOrClearMemoize() {
 		// console.log(Object.keys(this.cache.memoize))
 		this.cache.memoize = this.cache.memoize || {}
 		for (let key of Object.keys(this.cache.memoize)) {
 			const info = this.cache.memoize[key]
-			info.options.autoUpdate = Math.min(info.options.autoUpdate|0, MAX_AUTO_UPDATES)
+			info.options.autoUpdate = Math.min(info.options.autoUpdate | 0, MAX_AUTO_UPDATES)
 
 			const ageInSeconds = (Date.now() - info.ts) / 1000 | 0
 
 			const stale = info.options.stale ? info.options.stale : info.options.ttl
-			const wait = info.options.ttl + (stale-info.options.ttl)/(info.options.autoUpdate + 1)
+			const wait = info.options.ttl + (stale - info.options.ttl) / (info.options.autoUpdate + 1)
 			// console.log("wait",wait)
 
 			if (ageInSeconds > wait) {
@@ -236,6 +300,8 @@ export class CacheUtil<CacheType extends Model> {
 			return this.runningPromises[key]
 		}
 	}
+
+
 }
 
 export async function makeCache<CacheType extends Model>(name: string,

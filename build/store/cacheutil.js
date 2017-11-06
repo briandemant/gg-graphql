@@ -8,6 +8,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const lodash_1 = require("lodash");
 const { promisify } = require('util');
 const fs = require('fs');
 const zlib = require('zlib');
@@ -17,6 +18,9 @@ const unzipAsync = promisify(zlib.unzip);
 const gzipAsync = promisify(zlib.gzip);
 const MAX_AUTO_UPDATES = 10;
 const useZip = process.env.ENV !== "develop";
+function to_human_debug(item) {
+    return typeof item.item.title !== "undefined" ? item.item.title : item.item.username;
+}
 function loadFromDisk(name) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -49,12 +53,15 @@ function saveToDisk(name, cache) {
             const gzipped = yield gzipAsync(JSON.stringify(cache));
             yield writeFileAsync(`./data/${name}.json.gz`, gzipped);
             cache.hasChanged = false;
-            // console.log(`saved ${name} cache`)
+            // console.log(`\n\nsaved ${name} cache\n\n`)
         }
     });
 }
-function waitWithJitter(wait) {
-    return wait * 1000 * (0.8 + 0.3 * Math.random()) | 0;
+function waitWithJitter(waitInSeconds) {
+    return addJitter(waitInSeconds) * 1000;
+}
+function addJitter(waitInSeconds) {
+    return waitInSeconds * (0.8 + 0.3 * Math.random()) | 0;
 }
 class CacheUtil {
     constructor(name, refreshItemFn, refreshItemRateInSeconds) {
@@ -62,6 +69,7 @@ class CacheUtil {
         this.refreshItemFn = refreshItemFn;
         this.refreshItemRateInSeconds = refreshItemRateInSeconds;
         this.runningPromises = {};
+        this.updateQueue = [];
     }
     init() {
         return __awaiter(this, void 0, void 0, function* () {
@@ -71,6 +79,7 @@ class CacheUtil {
                 this.autoRefreshItems().catch((err) => console.error(err));
                 this.saveCache().catch((err) => console.error(err));
                 this.updateOrClearMemoize().catch((err) => console.error(err));
+                this.processUpdateQueue().catch((err) => console.error(err));
             }, 1000);
         });
     }
@@ -91,33 +100,33 @@ class CacheUtil {
         return __awaiter(this, void 0, void 0, function* () {
             // console.log(`autoRefreshItems ${ this.name}`)
             for (let item of this.all()) {
-                if (this.isItemStale(item.id)) {
-                    let ageInSeconds = this.getAgeInSeconds(item.id);
-                    // console.log(this.name, item.id, (item as any).title || (item as any).username, ageInSeconds)
-                    const updated = yield this.refreshItemFn(item, ageInSeconds);
-                    // console.log("updated",updated)
-                    if (updated && (updated != item || item.hasChanged)) {
-                        const ts = Date.now();
-                        delete item.hasChanged;
-                        this.cache.byId[item.id] = { ts, item: updated };
-                        this.cache.hasChanged = true;
-                    }
+                // console.log(this.name, "item.id", item.id, this.getAgeInSeconds(item.id))
+                if (typeof item.id === "undefined") {
+                    delete this.cache.byId[item.id];
+                }
+                else if (this.isItemStale(item.id)) {
+                    // add to end of queue (low pri)
+                    this.scheduleUpdate(item.id, "low");
                 }
             }
-            let sleep = waitWithJitter(Math.max(this.refreshItemRateInSeconds / 100, 2));
-            // console.log("SLEEP ", sleep, this.name, this.refreshItemRateInSeconds)
+            let between = (value, min, max) => Math.min(max, Math.max(min, value));
+            let sleep = waitWithJitter(between(this.refreshItemRateInSeconds / 60, 60, 60 * 60));
+            // console.log("SLEEP ", sleep, this.name)
             setTimeout(() => {
                 this.autoRefreshItems().catch((err) => console.error(err));
             }, sleep);
         });
     }
     getAgeInSeconds(id) {
-        return (Date.now() - this.cache.byId[id].ts) / 1000 | 0;
+        const item = this.cache.byId[id];
+        return item ? (Date.now() - item.ts) / 1000 | 0 : Infinity;
     }
-    get(id) {
+    get(id, scheduleUpdate = true) {
         return __awaiter(this, void 0, void 0, function* () {
             const cached = this.cache.byId[id];
             if (typeof cached !== 'undefined') {
+                if (scheduleUpdate)
+                    this.scheduleUpdate(id);
                 return cached.item;
             }
             return this.refreshItemFn(id, Infinity).then((item) => item ? this.update(item) : item);
@@ -130,6 +139,16 @@ class CacheUtil {
     all(limit = 0) {
         const all = Object.keys(this.cache.byId).map(id => this.cache.byId[id].item);
         return limit == 0 ? all : all.slice(0, limit);
+    }
+    scheduleUpdate(id, priority = "high") {
+        // add to start of queue (high pri)
+        // console.log("scheduleUpdate", this.name, id, this.getAgeInSeconds(id))
+        if (priority === "high") {
+            this.updateQueue.unshift(id);
+        }
+        else {
+            this.updateQueue.push(id);
+        }
     }
     update(item) {
         this.cache.hasChanged = true;
@@ -145,9 +164,50 @@ class CacheUtil {
         if (!this.cache.byId[id].ts)
             return true;
         // add jitter to avoid all items are invalidated at the same time
-        let maxAgeWithJitter = waitWithJitter(this.refreshItemRateInSeconds);
+        let maxAgeWithJitter = addJitter(this.refreshItemRateInSeconds);
         let age = this.getAgeInSeconds(id);
         return age > maxAgeWithJitter;
+    }
+    processUpdateQueue() {
+        return __awaiter(this, void 0, void 0, function* () {
+            const BATCH_TIME = 5 * 1000;
+            // if (this.name != "category") {
+            // 	return
+            // }
+            // console.log("START processUpdateQueue")
+            let processQueue = lodash_1.uniq(this.updateQueue);
+            if (processQueue.length > 0) {
+                console.log("processUpdateQueue", this.name, processQueue.length);
+                const started = Date.now();
+                let processed = [];
+                for (const id of processQueue) {
+                    let ageInSeconds = this.getAgeInSeconds(id);
+                    const item = this.cache.byId[id] ? this.cache.byId[id] : id;
+                    if (typeof item === "undefined") {
+                        delete this.cache.byId[id];
+                        continue;
+                    }
+                    console.log("updating", this.name, id, to_human_debug(item), ((ageInSeconds / 60 | 0) / 60 * 100 | 0) / 100 + "h");
+                    const updated = yield this.refreshItemFn(item.item, waitWithJitter(ageInSeconds) / 1000);
+                    if (updated) {
+                        const ts = Date.now();
+                        delete updated.hasChanged;
+                        this.cache.byId[id] = { ts, item: updated };
+                        this.cache.hasChanged = true;
+                    }
+                    processed.push(id);
+                    if (Date.now() - started > BATCH_TIME)
+                        break;
+                }
+                this.updateQueue = lodash_1.difference(lodash_1.uniq(this.updateQueue), processed);
+                console.log("processed         ", this.name, processed.length);
+                console.log("after             ", this.name, this.updateQueue.length);
+            }
+            setTimeout(() => {
+                // console.log("AGAIN", this.name, this.updateQueue.length)
+                this.processUpdateQueue().catch((err) => console.log(err));
+            }, waitWithJitter(1));
+        });
     }
     updateOrClearMemoize() {
         return __awaiter(this, void 0, void 0, function* () {

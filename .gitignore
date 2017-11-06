@@ -2,3 +2,7 @@
 data
 rmp
 tmp
+.tscache/
+graphql.config.json
+graphql.schema.json
+node_modules/
