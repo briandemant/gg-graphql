@@ -3,7 +3,7 @@ import { Model } from "./model"
 import { ListingRepo } from "./listing"
 import { CacheUtil, makeCache } from "./cacheutil"
 
-let FORCE_REFRESH_ITEMS = 1 * 60
+let FORCE_REFRESH_ITEMS = 5 * 60 * 60
 
 function fakeUser(id: number): User {
 	return {

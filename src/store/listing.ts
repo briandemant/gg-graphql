@@ -4,7 +4,7 @@ import { UserRepo } from "./store"
 import { CacheUtil, makeCache } from "./cacheutil"
 import { flatten } from "lodash"
 
-let FORCE_REFRESH_ITEMS = 4 * 60 * 60
+let FORCE_REFRESH_ITEMS = 24 * 60 * 60
 
 type TransactionType = "SELL" | "BUY" | "GIVEAWAY" | "OTHER" | "RENT_OUT" | "TO_RENT" | "UNKNOWN"
 
