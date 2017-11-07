@@ -52,7 +52,18 @@ export default () => {
 			},
 		},
 
-		User: {},
+		User: {
+			avatar: ({ avatar }: { avatar: number | null }, { size }: { size: ImageSizeType }, ctx: Context, meta: Meta) => {
+				return avatar ? ImageRepo.find(avatar, size) : avatar
+			},
+			extra: (root: Root) => ({ user: root }),
+		},
+
+		UserExtra: {
+			listings: async (root: Root, { limit }: any, ctx: Context) => {
+				return UserRepo.listings(root.user.id, limit)
+			},
+		},
 
 		Image: {
 			url: ({ id, size }: IdAndSize) => toImageUrl(id, size),

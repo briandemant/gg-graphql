@@ -3,6 +3,9 @@ import { difference } from "lodash"
 import { Model } from "./model"
 import { CacheUtil, makeCache } from "./cacheutil"
 
+
+let FORCE_REFRESH_ITEMS = 24 * 60 * 60
+
 export interface Category extends Model {
 	id: number
 	count: number
@@ -12,11 +15,18 @@ export interface Category extends Model {
 	title_slug: string
 	children: number[]
 	parents: number[]
-	can_create: boolean
+	can_create: boolean,
+	extra : {
+		listings : number[]
+	}
 }
 
 
 async function refreshItemFn(category: Category | number, ageInSeconds: number): Promise<Category | null> {
+	if (ageInSeconds < 60) {
+		return null
+	}
+
 	let id
 
 	if (typeof category === 'number') {
@@ -31,15 +41,16 @@ async function refreshItemFn(category: Category | number, ageInSeconds: number):
 			parents: [],
 			children: [],
 			can_create: false,
+			extra : {
+				listings :  []
+			}
 		} as Category
 	} else {
 		id = category.id
 	}
 
 	category.level = category.parents.length
-	if (ageInSeconds < 60) {
-		return null
-	}
+
 	// else if (ageInSeconds>46)
 	// throw new Error("ageInSeconds")
 	// console.log("category", id, category.title_slug)
@@ -127,7 +138,7 @@ async function rebuildTree() {
 
 
 (async () => {
-	cache = await makeCache<Category>("category", refreshItemFn, 2 * 24 * 60 * 60)
+	cache = await makeCache<Category>("category", refreshItemFn, FORCE_REFRESH_ITEMS)
 
 	rebuildTree().catch((err) => console.log(err))
 })()

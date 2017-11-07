@@ -14,7 +14,7 @@ function fetchJson(url, params) {
         var query = Object.keys(params)
             .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k]))
             .join('&');
-        console.log(url + "?" + query);
+        // console.log(url + "?" + query)
         const response = yield node_fetch_1.default(url + "?" + query);
         return yield response.json();
     });

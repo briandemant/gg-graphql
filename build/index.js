@@ -17,7 +17,7 @@ const start = () => __awaiter(this, void 0, void 0, function* () {
     var app = express();
     app.use('/graphql', bodyParser.json(), graphqlExpress({ schema }));
     app.use('/*', graphiqlExpress({ endpointURL: '/graphql' }));
-    const PORT = 3000;
+    const PORT = process.env.PORT || 3002;
     app.listen(PORT, () => {
         console.log(`Gul og Gratis GraphQL server running on port ${PORT}.`);
     });

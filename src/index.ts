@@ -8,7 +8,6 @@ const bodyParser = require('body-parser')
 const { graphqlExpress, graphiqlExpress } = require('apollo-server-express')
 
 
-
 const start = async () => {
 	const schema = require('./schema/schema')
 
@@ -16,7 +15,7 @@ const start = async () => {
 	app.use('/graphql', bodyParser.json(), graphqlExpress({ schema }))
 	app.use('/*', graphiqlExpress({ endpointURL: '/graphql' }))
 
-	const PORT = 3000
+	const PORT = process.env.PORT || 3002
 	app.listen(PORT, () => {
 		console.log(`Gul og Gratis GraphQL server running on port ${PORT}.`)
 	})

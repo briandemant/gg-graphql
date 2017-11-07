@@ -37,33 +37,35 @@ type Listing {
 	transaction_type: TransactionType!
 	user: User!
 	category: Category!
-	images(size:ImageSizeType):[Image!]
+	images(size: ImageSizeType): [Image!]
 	phone: String!
 	address: String
 	zipcode: String
 	city: String
 	country: String
-	extra : ListingExtra
+	extra: ListingExtra
 }
 
 type ListingExtra {
-	related_listings: [Listing!]
+	related(limit:Int): [Listing!]
 }
 
 type ListingList {
-	count:Int!
-	results:[Listing!]
+	count: Int!
+	results: [Listing!]
 }
 
 type User {
 	id: Int!
 	username: String!
 	phone: String!
-	extra : UserExtra
+	has_nemid: Boolean
+	avatar(size: ImageSizeType): Image
+	extra: UserExtra
 }
 
 type UserExtra {
-	listings : [Listing!]
+	listings(limit:Int): [Listing!]
 }
 
 type Image {
@@ -80,12 +82,17 @@ type Query {
 	category_roots: [Category]
 	# --
 	listing(id: Int!): Listing
-	listing_latest(category: Int,limit :Int): ListingList
-	listing_search(query: String, category: Int,user: Int,limit :Int):ListingList
+	listing_latest(category: Int, limit: Int): ListingList
+	listing_search(
+		query: String
+		category: Int
+		user: Int
+		limit: Int
+	): ListingList
 	# --
 	user(id: Int!): User
 	# --
-	image(id: Int!,size:ImageSizeType): Image
+	image(id: Int!, size: ImageSizeType): Image
 	# --
 	errors: [String]
 }

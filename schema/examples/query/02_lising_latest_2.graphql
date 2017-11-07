@@ -1,0 +1,13 @@
+{
+	listing_latest(category: 597) {
+		count
+		results {
+			id
+			title
+			category {
+				id
+				title
+			}
+		}
+	}
+}

@@ -12,10 +12,12 @@ const fetch_1 = require("../fetch");
 const store_1 = require("./store");
 const cacheutil_1 = require("./cacheutil");
 const lodash_1 = require("lodash");
+let FORCE_REFRESH_ITEMS = 4 * 60 * 60;
 function refreshItemFn(item, ageInSeconds) {
     return __awaiter(this, void 0, void 0, function* () {
-        if (ageInSeconds < 60 * 60)
+        if (ageInSeconds < 60) {
             return null;
+        }
         let id;
         if (typeof item === 'string') {
             item = parseInt(item);
@@ -28,6 +30,7 @@ function refreshItemFn(item, ageInSeconds) {
                 phone: "",
                 description: "",
                 price: 0,
+                online: false,
                 user: 0,
                 category: 0,
                 transaction_type: "UNKNOWN",
@@ -47,21 +50,28 @@ function refreshItemFn(item, ageInSeconds) {
         }
         const data = yield fetch_1.fetchJson(`https://api.guloggratis.dk/modules/gg_app/ad/view`, { id });
         // console.log(data)
+        // process.exit()
         if (data.success) {
             let phone = "";
             try {
                 phone = data.tlf ? data.tlf.replace(" ", "").replace(/(\+?[0-9]{2})/g, (x, _, idx) => {
                     return (idx == 0 ? x : ` ${x}`);
                 }).trim() : "";
+                let avatar = null;
+                if (data.profileImage !== "" && data.profileImage) {
+                    avatar = data.profileImage.replace(/.*.dk\/[0-9]+\/([0-9]+)_.*/, "$1") | 0;
+                }
                 store_1.UserRepo.saveToCache({
                     id: data.userid,
                     username: data.username.trim(),
                     phone: phone,
-                    nemid_validated: data.user_nem_id_validate,
+                    has_nemid: data.user_nem_id_validate,
+                    avatar: avatar,
                 });
             }
             catch (e) {
-                console.log(data);
+                console.log(e, data);
+                process.exit();
             }
             let transaction_type;
             switch (Object.keys(data.sales_type)[0]) {
@@ -104,6 +114,7 @@ function refreshItemFn(item, ageInSeconds) {
                 phone: phone,
                 description: data.descriptionForEditing,
                 price: Math.min(2147483600, data.price_value * 100),
+                online: data.online,
                 user: data.userid,
                 category: data.categoryid,
                 transaction_type: transaction_type,
@@ -122,7 +133,7 @@ function refreshItemFn(item, ageInSeconds) {
 }
 let cache;
 (() => __awaiter(this, void 0, void 0, function* () {
-    cache = yield cacheutil_1.makeCache("listing", refreshItemFn, 5 * 24 * 60 * 60);
+    cache = yield cacheutil_1.makeCache("listing", refreshItemFn, FORCE_REFRESH_ITEMS);
 }))();
 class ListingRepo {
     static find(id) {
@@ -130,22 +141,28 @@ class ListingRepo {
             return cache.get(id);
         });
     }
+    static findButDontUpdate(id) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return cache.get(id, false);
+        });
+    }
     static latest(category, limit = 20) {
         return __awaiter(this, void 0, void 0, function* () {
             let memoize = cache.memoize("latest", { limit: limit, category: category }, {
                 ttl: 30,
-                stale: 60 * 60,
+                stale: 2 * 60 * 60,
                 autoUpdate: 10,
             }, (params) => __awaiter(this, void 0, void 0, function* () {
                 const data = yield fetch_1.fetchJson(`https://api.guloggratis.dk/modules/gg_front/latest_items`, {
-                    number: 100,
+                    number: Math.max(params.limit, 1000),
                     category_id: params.category,
                 });
                 return data.map((listing) => listing.adid);
             }));
             return memoize.then((list) => __awaiter(this, void 0, void 0, function* () {
                 const results = [];
-                for (let id of list.slice(0, limit)) {
+                list = limit > 0 ? list.slice(0, limit) : list;
+                for (let id of list) {
                     let item = yield ListingRepo.find(id);
                     if (item) {
                         results.push(item);
@@ -162,8 +179,8 @@ class ListingRepo {
             user = typeof user === "undefined" ? 0 : user;
             let memoize = cache.memoize("search", { query, user, category }, {
                 ttl: 30,
-                stale: 60 * 60,
-                autoUpdate: 3,
+                stale: 2 * 60 * 60,
+                autoUpdate: 10,
             }, (params) => __awaiter(this, void 0, void 0, function* () {
                 let url = `https://api.guloggratis.dk/modules/gg_app/search/result`;
                 let query = {
@@ -179,7 +196,8 @@ class ListingRepo {
             }));
             return memoize.then((result) => __awaiter(this, void 0, void 0, function* () {
                 const results = [];
-                for (let id of result.results.slice(0, limit)) {
+                let list = limit > 0 ? result.results.slice(0, limit) : result.results;
+                for (let id of list) {
                     let item = yield ListingRepo.find(id);
                     if (item) {
                         results.push(item);

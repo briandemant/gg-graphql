@@ -10,7 +10,8 @@
 		"start": "node build/index.js",
 		"build": "rm -rf build/* && tsc --pretty",
 		"clean": "rm -rf build/*",
-		"dev": "tsc -w --pretty & (sleep 5 && nodemon -d 1 -w build build/index.js)"
+		"dev": "tsc -w --pretty & (sleep 5 && nodemon -d 1 -w build build/index.js)",
+		"dev_ts": "nodemon -i data/ --exec 'ts-node --cache-directory .tscache' src/index.ts"
 	},
 	"dependencies": {
 		"@types/lodash": "^4.14.80",

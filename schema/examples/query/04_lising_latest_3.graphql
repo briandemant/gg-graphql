@@ -1,0 +1,22 @@
+{
+	listing_latest(limit:10) {
+		count
+		results {
+			id
+			title
+			images {
+				url
+			}
+			user {
+				id
+				avatar(size:SMALL){url}
+				extra {
+					listings  {
+						id title
+
+					}
+				}
+			}
+		}
+	}
+}

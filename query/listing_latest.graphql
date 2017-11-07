@@ -1,5 +1,0 @@
-{"query":"{
-  listing_latest {
-    id title
-  }
-}","variables":null,"operationName":null}

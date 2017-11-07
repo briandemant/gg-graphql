@@ -4,6 +4,8 @@ import { UserRepo } from "./store"
 import { CacheUtil, makeCache } from "./cacheutil"
 import { flatten } from "lodash"
 
+let FORCE_REFRESH_ITEMS = 4 * 60 * 60
+
 type TransactionType = "SELL" | "BUY" | "GIVEAWAY" | "OTHER" | "RENT_OUT" | "TO_RENT" | "UNKNOWN"
 
 export interface Listing extends Model {
@@ -12,6 +14,7 @@ export interface Listing extends Model {
 	readonly description: string
 	readonly phone: string
 	readonly price: number
+	readonly online: boolean
 	readonly user: number
 	readonly category: number
 	readonly transaction_type: TransactionType
@@ -23,7 +26,9 @@ export interface Listing extends Model {
 }
 
 async function refreshItemFn(item: Listing | number, ageInSeconds: number): Promise<Listing | null> {
-	if (ageInSeconds < 60 * 60) return null
+	if (ageInSeconds < 60) {
+		return null
+	}
 
 	let id
 	if (typeof item === 'string') {
@@ -37,6 +42,7 @@ async function refreshItemFn(item: Listing | number, ageInSeconds: number): Prom
 			phone: "",
 			description: "",
 			price: 0,
+			online: false,
 			user: 0,
 			category: 0,
 			transaction_type: "UNKNOWN",
@@ -57,7 +63,7 @@ async function refreshItemFn(item: Listing | number, ageInSeconds: number): Prom
 
 	const data = await fetchJson(`https://api.guloggratis.dk/modules/gg_app/ad/view`, { id })
 	// console.log(data)
-
+// process.exit()
 	if (data.success) {
 		let phone = ""
 		try {
@@ -65,15 +71,22 @@ async function refreshItemFn(item: Listing | number, ageInSeconds: number): Prom
 				return (idx == 0 ? x : ` ${x}`)
 			}).trim() : ""
 
+			let avatar = null
+			if (data.profileImage !== "" && data.profileImage) {
+				avatar = data.profileImage.replace(/.*.dk\/[0-9]+\/([0-9]+)_.*/, "$1") | 0
+			}
+
 			UserRepo.saveToCache({
-				                     id: data.userid,
-				                     username: data.username.trim(),
-				                     phone: phone,
-				                     nemid_validated: data.user_nem_id_validate,
-			                     })
+				id: data.userid,
+				username: data.username.trim(),
+				phone: phone,
+				has_nemid: data.user_nem_id_validate,
+				avatar: avatar,
+			})
 
 		} catch (e) {
-			console.log(data)
+			console.log(e, data)
+			process.exit()
 		}
 
 		let transaction_type: TransactionType
@@ -119,6 +132,7 @@ async function refreshItemFn(item: Listing | number, ageInSeconds: number): Prom
 			phone: phone,
 			description: data.descriptionForEditing,
 			price: Math.min(2147483600, data.price_value * 100),
+			online: data.online,
 			user: data.userid,
 			category: data.categoryid,
 			transaction_type: transaction_type,
@@ -138,7 +152,7 @@ async function refreshItemFn(item: Listing | number, ageInSeconds: number): Prom
 let cache: CacheUtil<Listing>
 
 (async () => {
-	cache = await makeCache<Listing>("listing", refreshItemFn, 5 * 24 * 60 * 60)
+	cache = await makeCache<Listing>("listing", refreshItemFn, FORCE_REFRESH_ITEMS)
 })()
 
 
@@ -147,15 +161,20 @@ export class ListingRepo {
 		return cache.get(id)
 	}
 
+
+	static async findButDontUpdate(id: number): Promise<Listing | null> {
+		return cache.get(id, false)
+	}
+
 	static async latest(category?: number, limit: number = 20): Promise<{ count: number, results: Listing[] }> {
 		let memoize = cache.memoize<number[]>("latest", { limit: limit, category: category }, {
 			ttl: 30,
-			stale: 60 * 60,
+			stale: 2 * 60 * 60,
 			autoUpdate: 10,
 		}, async (params) => {
 
 			const data = await fetchJson(`https://api.guloggratis.dk/modules/gg_front/latest_items`, {
-				number: 100,
+				number: Math.max(params.limit, 1000),
 				category_id: params.category,
 			})
 			return data.map((listing: { adid: number }) => listing.adid as number)
@@ -164,7 +183,8 @@ export class ListingRepo {
 
 		return memoize.then(async (list: number[]) => {
 			const results: Listing[] = []
-			for (let id of list.slice(0, limit)) {
+			list = limit > 0 ? list.slice(0, limit) : list
+			for (let id of list) {
 				let item = await ListingRepo.find(id)
 				if (item) {
 					results.push(item)
@@ -182,8 +202,8 @@ export class ListingRepo {
 
 		let memoize = cache.memoize<{ count: number, results: number[] }>("search", { query, user, category }, {
 			ttl: 30,
-			stale: 60 * 60,
-			autoUpdate: 3,
+			stale: 2 * 60 * 60,
+			autoUpdate: 10,
 		}, async (params) => {
 			let url = `https://api.guloggratis.dk/modules/gg_app/search/result`
 			let query = {
@@ -201,7 +221,8 @@ export class ListingRepo {
 
 		return memoize.then(async (result: { count: number, results: number[] }) => {
 			const results: Listing[] = []
-			for (let id of result.results.slice(0, limit)) {
+			let list = limit > 0 ? result.results.slice(0, limit) : result.results
+			for (let id of list) {
 				let item = await  ListingRepo.find(id)
 				if (item) {
 					results.push(item)

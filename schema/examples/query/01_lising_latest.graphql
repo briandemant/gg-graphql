@@ -1,0 +1,9 @@
+{
+    listing_latest {
+        count
+        results {
+            id
+            title
+        }
+    }
+}

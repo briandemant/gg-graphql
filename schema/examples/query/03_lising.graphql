@@ -1,0 +1,29 @@
+{
+	listing(id: 38435894) {
+		id
+		title
+		price
+		phone
+		description
+		category {
+			id
+			title_slug
+			slug
+		}
+		user {
+			id
+			avatar(size: SMALL) {
+				url
+			}
+			extra {
+				listings {
+					id
+					title
+				}
+			}
+		}
+		images {
+			url
+		}
+	}
+}

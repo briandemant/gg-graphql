@@ -11,8 +11,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const fetch_1 = require("../fetch");
 const lodash_1 = require("lodash");
 const cacheutil_1 = require("./cacheutil");
+let FORCE_REFRESH_ITEMS = 24 * 60 * 60;
 function refreshItemFn(category, ageInSeconds) {
     return __awaiter(this, void 0, void 0, function* () {
+        if (ageInSeconds < 60) {
+            return null;
+        }
         let id;
         if (typeof category === 'number') {
             id = category;
@@ -26,15 +30,15 @@ function refreshItemFn(category, ageInSeconds) {
                 parents: [],
                 children: [],
                 can_create: false,
+                extra: {
+                    listings: []
+                }
             };
         }
         else {
             id = category.id;
         }
         category.level = category.parents.length;
-        if (ageInSeconds < 60) {
-            return null;
-        }
         // else if (ageInSeconds>46)
         // throw new Error("ageInSeconds")
         // console.log("category", id, category.title_slug)
@@ -118,7 +122,7 @@ function rebuildTree() {
     });
 }
 (() => __awaiter(this, void 0, void 0, function* () {
-    cache = yield cacheutil_1.makeCache("category", refreshItemFn, 2 * 24 * 60 * 60);
+    cache = yield cacheutil_1.makeCache("category", refreshItemFn, FORCE_REFRESH_ITEMS);
     rebuildTree().catch((err) => console.log(err));
 }))();
 class CategoryRepo {

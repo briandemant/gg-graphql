@@ -99,7 +99,7 @@ export class CacheUtil<CacheType extends Model> {
 			}
 			setTimeout(() => {
 				this.saveCache().catch((err) => console.error(err))
-			}, waitWithJitter(2))
+			}, waitWithJitter(30))
 		}
 	}
 
@@ -155,6 +155,9 @@ export class CacheUtil<CacheType extends Model> {
 		// add to start of queue (high pri)
 		// console.log("scheduleUpdate", this.name, id, this.getAgeInSeconds(id))
 		if (priority === "high") {
+			var item = this.cache.byId[id]
+			let  ageInSeconds = this.getAgeInSeconds(id)
+			console.log("updating", this.name, id, to_human_debug(item), ((ageInSeconds / 60 | 0) / 60 * 100 | 0) / 100 + "h")
 			this.updateQueue.unshift(id)
 		} else {
 			this.updateQueue.push(id)
@@ -193,7 +196,7 @@ export class CacheUtil<CacheType extends Model> {
 
 		let processQueue = uniq(this.updateQueue)
 		if (processQueue.length > 0) {
-			console.log("processUpdateQueue", this.name, processQueue.length)
+			// console.log("processUpdateQueue", this.name, processQueue.length)
 
 			const started = Date.now()
 			let processed: number[] = []
@@ -205,7 +208,7 @@ export class CacheUtil<CacheType extends Model> {
 					delete this.cache.byId[id]
 					continue
 				}
-				console.log("updating", this.name, id, to_human_debug(item), ((ageInSeconds / 60 | 0) / 60 * 100 | 0) / 100 + "h")
+			//	console.log("updating", this.name, id, to_human_debug(item), ((ageInSeconds / 60 | 0) / 60 * 100 | 0) / 100 + "h")
 				const updated = await this.refreshItemFn(item.item, waitWithJitter(ageInSeconds) / 1000)
 
 				if (updated) {
@@ -220,15 +223,15 @@ export class CacheUtil<CacheType extends Model> {
 			}
 			this.updateQueue = difference(uniq(this.updateQueue), processed)
 
-			console.log("processed         ", this.name, processed.length)
-			console.log("after             ", this.name, this.updateQueue.length)
+			console.log("processed", ("      "+this.name).substr(-10), processed.length,">",this.updateQueue.length)
+			// console.log("after             ", this.name, this.updateQueue.length)
 		}
 
 		setTimeout(() => {
 			// console.log("AGAIN", this.name, this.updateQueue.length)
 
 			this.processUpdateQueue().catch((err) => console.log(err))
-		}, waitWithJitter(1))
+		}, waitWithJitter(0.1))
 	}
 
 	private async updateOrClearMemoize() {
@@ -279,7 +282,7 @@ export class CacheUtil<CacheType extends Model> {
 		console.log("FETCHING", name, params)
 		this.runningPromises[key] = this.runningPromises[key] || fn(params).then((value) => {
 			delete this.runningPromises[key]
-			// console.log("REFRESHING CACHE .. done")
+			console.log("REFRESHING CACHE .. done")
 
 			this.cache.memoize[key] = {
 				ts: Date.now(),
@@ -293,7 +296,7 @@ export class CacheUtil<CacheType extends Model> {
 		})
 
 		if (result && options.stale && Date.now() < result.ts + options.stale * 1000) {
-			// console.log("stale ok")
+			console.log("stale ok")
 			return result.value
 		} else {
 			// console.log("need update")
