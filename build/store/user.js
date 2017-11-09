@@ -19,6 +19,8 @@ function fakeUser(id) {
         phone: fake_1.default.phone(id),
         has_nemid: false,
         avatar: null,
+        createdAt: 0,
+        updatedAt: Date.now(),
     };
 }
 function refreshItemFn(user, ageInSeconds) {
@@ -44,7 +46,14 @@ let cache;
 class UserRepo {
     static find(id) {
         return __awaiter(this, void 0, void 0, function* () {
-            return cache.get(id);
+            let user = yield cache.get(id);
+            if (!user) {
+                user = fakeUser(id);
+            }
+            if (!user.createdAt) {
+                user.createdAt = Date.now() - Math.random() * 1000 * 24 * 60 * 60 * 1000;
+            }
+            return user;
         });
     }
     static listings(id, limit) {

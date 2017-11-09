@@ -11,12 +11,13 @@ export interface Category extends Model {
 	level: number
 	slug: string
 	title: string
+	createdAt: number
+	updatedAt: number
 	title_slug: string
 	children: number[]
 	parents: number[]
 	can_create: boolean,
 	extra: {
-		listings: number[],
 		status: "ok" | "error",
 	}
 }
@@ -37,11 +38,12 @@ async function refreshItemFn(category: Category | number, ageInSeconds: number):
 			count: 0,
 			slug: "/",
 			title_slug: "",
+			createdAt: Date.now(),
+			updatedAt: Date.now(),
 			parents: [],
 			children: [],
 			can_create: false,
 			extra: {
-				listings: [],
 				status: "ok",
 			},
 		} as Category
@@ -71,6 +73,11 @@ async function refreshItemFn(category: Category | number, ageInSeconds: number):
 				`https://api.guloggratis.dk/modules/gulgratis/ajax/ad_creator.fetch_categories_for_select.php`,
 				{ parent_categoryid: id },
 			)
+
+			if (!category.createdAt) {
+				(category as { createdAt: number }).createdAt = Date.now() - Math.random() * 1000 * 24 * 60 * 60 * 1000
+			}
+			category.updatedAt = Date.now()
 
 			category.title = catInfo.name
 			category.slug = catInfo.GAScreenValue

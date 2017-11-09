@@ -28,6 +28,13 @@ type IdAndSize = { id: number, size: ImageSizeType }
 
 type QueryParams = { query: string, limit: number, category: number, user: number }
 
+function toDateOrNull(createdAt: number | null) {
+	if (!createdAt || createdAt <= 0) {
+		return ""
+	}
+	return new Date(createdAt).toISOString()
+}
+
 export default () => {
 	// noinspection TsLint
 	return {
@@ -67,6 +74,8 @@ export default () => {
 			children: ({ children }: any, { with_count }: any) => {
 				return children.map((id: number) => CategoryRepo.find(id)).filter((cat: Category) => !with_count || cat.count > 0)
 			},
+			createdAt: ({ createdAt }: any) => toDateOrNull(createdAt),
+			updatedAt: ({ updatedAt }: any) => toDateOrNull(updatedAt),
 		},
 
 		User: {
@@ -77,6 +86,8 @@ export default () => {
 			listings: async (root: Root, { limit }: any) => {
 				return UserRepo.listings(root.user.id, limit)
 			},
+			createdAt: ({ createdAt }: any) => toDateOrNull(createdAt),
+			updatedAt: ({ updatedAt }: any) => toDateOrNull(updatedAt),
 		},
 
 		Image: {
@@ -110,6 +121,10 @@ export default () => {
 
 				return shuffle(related).slice(0, limit)
 			},
+
+			createdAt: ({ createdAt }: any) => toDateOrNull(createdAt),
+			updatedAt: ({ updatedAt }: any) => toDateOrNull(updatedAt),
+			expiresAt: ({ expiresAt }: any) => toDateOrNull(expiresAt),
 		},
 	}
 }

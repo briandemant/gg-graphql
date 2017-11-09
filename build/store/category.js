@@ -27,11 +27,12 @@ function refreshItemFn(category, ageInSeconds) {
                 count: 0,
                 slug: "/",
                 title_slug: "",
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
                 parents: [],
                 children: [],
                 can_create: false,
                 extra: {
-                    listings: [],
                     status: "ok",
                 },
             };
@@ -56,6 +57,10 @@ function refreshItemFn(category, ageInSeconds) {
             else {
                 const catInfo = yield fetch_1.fetchJson(`https://api.guloggratis.dk/modules/gg_app/category/data`, { id });
                 const childInfo = yield fetch_1.fetchJson(`https://api.guloggratis.dk/modules/gulgratis/ajax/ad_creator.fetch_categories_for_select.php`, { parent_categoryid: id });
+                if (!category.createdAt) {
+                    category.createdAt = Date.now() - Math.random() * 1000 * 24 * 60 * 60 * 1000;
+                }
+                category.updatedAt = Date.now();
                 category.title = catInfo.name;
                 category.slug = catInfo.GAScreenValue;
                 const previousChildren = category.children;

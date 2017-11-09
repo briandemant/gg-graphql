@@ -5,6 +5,17 @@ import { CacheUtil, makeCache } from "./cacheutil"
 
 let FORCE_REFRESH_ITEMS = 24 * 60 * 60
 
+
+export interface User extends Model {
+	id: number
+	username: string
+	phone: string
+	has_nemid: boolean
+	avatar: number | null,
+	createdAt: number
+	updatedAt: number
+}
+
 function fakeUser(id: number): User {
 	return {
 		id,
@@ -12,7 +23,8 @@ function fakeUser(id: number): User {
 		phone: fake.phone(id),
 		has_nemid: false,
 		avatar: null,
-
+		createdAt: 0,
+		updatedAt: Date.now(),
 	}
 }
 
@@ -38,18 +50,17 @@ let cache: CacheUtil<User>
 	cache = await makeCache<User>(params)
 })()
 
-export interface User extends Model {
-	readonly id: number
-	readonly username: string
-	readonly phone: string
-	readonly has_nemid: boolean
-	readonly avatar: number | null,
-
-}
 
 export class UserRepo {
-	static async find(id: number): Promise<User | null> {
-		return cache.get(id)
+	static async find(id: number): Promise<User> {
+		let user = await cache.get(id)
+		if (!user) {
+			user = fakeUser(id)
+		}
+		if (!user.createdAt) {
+			(user as { createdAt: number }).createdAt = Date.now() - Math.random() * 1000 * 24 * 60 * 60 * 1000
+		}
+		return user
 	}
 
 	static async listings(id: number, limit: number) {

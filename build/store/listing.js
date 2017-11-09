@@ -65,13 +65,12 @@ function refreshItemFn(item, ageInSeconds) {
                 if (data.profileImage !== "" && data.profileImage) {
                     avatar = data.profileImage.replace(/.*.dk\/[0-9]+\/([0-9]+)_.*/, "$1") | 0;
                 }
-                let user = {
-                    id: data.userid,
-                    username: data.username.trim(),
-                    phone: phone,
-                    has_nemid: data.user_nem_id_validate,
-                    avatar: avatar,
-                };
+                let user = yield store_1.UserRepo.find(data.userid);
+                user.username = data.username.trim();
+                user.phone = phone;
+                user.has_nemid = data.user_nem_id_validate;
+                user.avatar = data.avatar;
+                user.updatedAt = Date.now();
                 store_1.UserRepo.saveToCache(user);
             }
             catch (e) {
@@ -123,7 +122,9 @@ function refreshItemFn(item, ageInSeconds) {
                 online: data.online,
                 // createdAt: "" + data.end,
                 // createdAt: new Date(Date.now() - data.num_online_days * 24 * 60 * 60 * 1000).toISOString(),
-                createdAt: new Date(data.end * 1000 - 8 * 7 * 24 * 60 * 60 * 1000).toISOString(),
+                createdAt: data.end * 1000 - 8 * 7 * 24 * 60 * 60 * 1000,
+                updatedAt: Date.now(),
+                expiresAt: data.end * 1000,
                 user: data.userid,
                 category: data.categoryid,
                 transaction_type: transactionType,
@@ -132,7 +133,6 @@ function refreshItemFn(item, ageInSeconds) {
                 city: data.city,
                 country: data.country,
                 images: images,
-                // end: new Date(data.end).toISOString(),
                 // isBusiness: data.isBusiness,
                 // isPaid: data.isPaid,
                 // numOnlineDays: data.num_online_days,

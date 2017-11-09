@@ -9,21 +9,23 @@ let FORCE_REFRESH_ITEMS = 24 * 60 * 60
 type TransactionType = "SELL" | "BUY" | "GIVEAWAY" | "OTHER" | "RENT_OUT" | "TO_RENT" | "UNKNOWN"
 
 export interface Listing extends Model {
-	readonly id: number
-	readonly title: string
-	readonly description: string
-	readonly phone: string
-	readonly price: number
-	readonly createdAt: string | null
-	readonly online: boolean
-	readonly user: number
-	readonly category: number
-	readonly transaction_type: TransactionType
-	readonly address: string
-	readonly zipcode: string
-	readonly city: string
-	readonly country: string
-	readonly images: number[]
+	id: number
+	title: string
+	description: string
+	phone: string
+	price: number
+	createdAt: number
+	updatedAt: number
+	expiresAt: number | null
+	online: boolean
+	user: number
+	category: number
+	transaction_type: TransactionType
+	address: string
+	zipcode: string
+	city: string
+	country: string
+	images: number[]
 	extra: { status: "ok" | "offline" | "error" }
 }
 
@@ -83,13 +85,14 @@ async function refreshItemFn(item: Listing | number, ageInSeconds: number): Prom
 				avatar = data.profileImage.replace(/.*.dk\/[0-9]+\/([0-9]+)_.*/, "$1") | 0
 			}
 
-			let user = {
-				id: data.userid,
-				username: data.username.trim(),
-				phone: phone,
-				has_nemid: data.user_nem_id_validate,
-				avatar: avatar,
-			}
+
+			let user = await UserRepo.find(data.userid)
+			user.username = data.username.trim()
+			user.phone = phone
+			user.has_nemid = data.user_nem_id_validate
+			user.avatar = data.avatar
+			user.updatedAt = Date.now()
+
 			UserRepo.saveToCache(user)
 
 		} catch (e) {
@@ -144,7 +147,9 @@ async function refreshItemFn(item: Listing | number, ageInSeconds: number): Prom
 			online: data.online,
 			// createdAt: "" + data.end,
 			// createdAt: new Date(Date.now() - data.num_online_days * 24 * 60 * 60 * 1000).toISOString(),
-			createdAt: new Date(data.end * 1000 - 8 * 7 * 24 * 60 * 60 * 1000).toISOString(),
+			createdAt: data.end * 1000 - 8 * 7 * 24 * 60 * 60 * 1000,
+			updatedAt: Date.now(),
+			expiresAt: data.end * 1000,
 			user: data.userid,
 			category: data.categoryid,
 			transaction_type: transactionType,
@@ -153,7 +158,6 @@ async function refreshItemFn(item: Listing | number, ageInSeconds: number): Prom
 			city: data.city,
 			country: data.country,
 			images: images,
-			// end: new Date(data.end).toISOString(),
 			// isBusiness: data.isBusiness,
 			// isPaid: data.isPaid,
 			// numOnlineDays: data.num_online_days,

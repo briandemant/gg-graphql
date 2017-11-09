@@ -21,6 +21,10 @@ type Category {
 	id: Int!
 	title: String!
 	level: Int!
+	# fake! it means cache was created
+	createdAt: String!
+	# fake! it means cache was updated
+	updatedAt: String!
 	title_slug: String!
 	slug: String!
 	count: Int!
@@ -38,7 +42,11 @@ type Listing {
 	price: Int!
 	transaction_type: TransactionType!
 	user: User!
+	# fake! calculated from expires
 	createdAt: String!
+	# fake! it means cache was updated
+	updatedAt: String!
+	expiresAt: String!
 	category: Category!
 	images(size: ImageSizeType): [Image!]
 	image(size: ImageSizeType): Image
@@ -65,6 +73,10 @@ type User {
 	username: String!
 	phone: String!
 	has_nemid: Boolean
+	# fake! it means cache was created
+	createdAt: String!
+	# fake! it means cache was updated
+	updatedAt: String!
 	avatar(size: ImageSizeType): Image
 
 	# Other listings by this user

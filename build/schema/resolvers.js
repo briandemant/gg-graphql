@@ -13,6 +13,12 @@ const listing_1 = require("../store/listing");
 const user_1 = require("../store/user");
 const image_1 = require("../store/image");
 const lodash_1 = require("lodash");
+function toDateOrNull(createdAt) {
+    if (!createdAt || createdAt <= 0) {
+        return "";
+    }
+    return new Date(createdAt).toISOString();
+}
 exports.default = () => {
     // noinspection TsLint
     return {
@@ -48,6 +54,8 @@ exports.default = () => {
             children: ({ children }, { with_count }) => {
                 return children.map((id) => category_1.CategoryRepo.find(id)).filter((cat) => !with_count || cat.count > 0);
             },
+            createdAt: ({ createdAt }) => toDateOrNull(createdAt),
+            updatedAt: ({ updatedAt }) => toDateOrNull(updatedAt),
         },
         User: {
             avatar: ({ avatar }, { size }) => {
@@ -56,6 +64,8 @@ exports.default = () => {
             listings: (root, { limit }) => __awaiter(this, void 0, void 0, function* () {
                 return user_1.UserRepo.listings(root.user.id, limit);
             }),
+            createdAt: ({ createdAt }) => toDateOrNull(createdAt),
+            updatedAt: ({ updatedAt }) => toDateOrNull(updatedAt),
         },
         Image: {
             url: ({ id, size }) => image_1.toImageUrl(id, size),
@@ -84,6 +94,9 @@ exports.default = () => {
                 let related = res.results.filter(listing => listing.id !== id);
                 return lodash_1.shuffle(related).slice(0, limit);
             }),
+            createdAt: ({ createdAt }) => toDateOrNull(createdAt),
+            updatedAt: ({ updatedAt }) => toDateOrNull(updatedAt),
+            expiresAt: ({ expiresAt }) => toDateOrNull(expiresAt),
         },
     };
 };
