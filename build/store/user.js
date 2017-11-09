@@ -11,7 +11,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const fake_1 = require("./fake");
 const listing_1 = require("./listing");
 const cacheutil_1 = require("./cacheutil");
-let FORCE_REFRESH_ITEMS = 1 * 60;
+let FORCE_REFRESH_ITEMS = 24 * 60 * 60;
 function fakeUser(id) {
     return {
         id,
@@ -23,17 +23,23 @@ function fakeUser(id) {
 }
 function refreshItemFn(user, ageInSeconds) {
     return __awaiter(this, void 0, void 0, function* () {
-        if (ageInSeconds < 10) {
+        if (ageInSeconds < 5 * 60) {
             return null;
         }
-        if (typeof user === "number")
+        if (typeof user === "number") {
             return fakeUser(user);
+        }
         return null;
     });
 }
 let cache;
 (() => __awaiter(this, void 0, void 0, function* () {
-    cache = yield cacheutil_1.makeCache("user", refreshItemFn, FORCE_REFRESH_ITEMS);
+    const params = {
+        name: "user",
+        refreshItemFn: refreshItemFn,
+        refreshItemRateInSeconds: FORCE_REFRESH_ITEMS,
+    };
+    cache = yield cacheutil_1.makeCache(params);
 }))();
 class UserRepo {
     static find(id) {
@@ -43,13 +49,12 @@ class UserRepo {
     }
     static listings(id, limit) {
         return __awaiter(this, void 0, void 0, function* () {
-            return (yield listing_1.ListingRepo.search("", 0, id, limit)).results; //.map(l => l.id)
+            let x = yield listing_1.ListingRepo.search("", 0, id, limit);
+            return x.results;
         });
     }
     static saveToCache(user) {
-        return __awaiter(this, void 0, void 0, function* () {
-            cache.update(user);
-        });
+        cache.update(user);
     }
 }
 exports.UserRepo = UserRepo;

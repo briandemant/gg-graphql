@@ -23,7 +23,7 @@ function fakeImage(id) {
         version: 0,
         url: toImageUrl(id, "ORIGINAL"),
         size: "ORIGINAL",
-        width: exports.ImageSizes["ORIGINAL"], height: exports.ImageSizes["ORIGINAL"],
+        width: exports.ImageSizes.ORIGINAL, height: exports.ImageSizes.ORIGINAL,
     };
 }
 function scaleImage(image, size) {
@@ -52,16 +52,23 @@ function scaleImage(image, size) {
 }
 function refreshItemFn(image, ageInSeconds) {
     return __awaiter(this, void 0, void 0, function* () {
-        if (typeof image === "number")
+        if (typeof image === "number") {
             return fakeImage(image);
-        if (ageInSeconds > 5)
+        }
+        if (ageInSeconds > 5) {
             return fakeImage(image.id);
+        }
         return null;
     });
 }
 let cache;
 (() => __awaiter(this, void 0, void 0, function* () {
-    cache = yield cacheutil_1.makeCache("image", refreshItemFn, 60 * 60 * 24 * 365);
+    let params = {
+        name: "image",
+        refreshItemFn: refreshItemFn,
+        refreshItemRateInSeconds: 60 * 60 * 24 * 365,
+    };
+    cache = yield cacheutil_1.makeCache(params);
 }))();
 exports.ImageSizes = {
     "ORIGINAL": 2400,
@@ -78,8 +85,9 @@ class ImageRepo {
                 size = "NORMAL";
             }
             const image = yield cache.get(id);
-            if (!image)
+            if (!image) {
                 return null;
+            }
             return scaleImage(image, size);
         });
     }

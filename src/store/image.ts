@@ -17,9 +17,7 @@ function fakeImage(id: number): Image {
 		version: 0,
 		url: toImageUrl(id, "ORIGINAL"),
 		size: "ORIGINAL",
-		width:  ImageSizes[ "ORIGINAL"], height:  ImageSizes[ "ORIGINAL"],
-		// width: 0, height: 0,
-		// width: size[0], height: size[1],
+		width: ImageSizes.ORIGINAL, height: ImageSizes.ORIGINAL,
 	}
 }
 
@@ -52,15 +50,25 @@ async function scaleImage(image: Image, size: ImageSizeType): Promise<Image> {
 
 async function refreshItemFn(image: Image | number, ageInSeconds: number): Promise<Image | null> {
 
-	if (typeof  image === "number") return fakeImage(image)
-	if (ageInSeconds > 5) return fakeImage(image.id)
+	if (typeof  image === "number") {
+		return fakeImage(image)
+	}
+
+	if (ageInSeconds > 5) {
+		return fakeImage(image.id)
+	}
 
 	return null
 }
 
 let cache: CacheUtil<Image>
 (async () => {
-	cache = await makeCache<Image>("image", refreshItemFn, 60 * 60 * 24 * 365)
+	let params = {
+		name: "image",
+		refreshItemFn: refreshItemFn,
+		refreshItemRateInSeconds: 60 * 60 * 24 * 365,
+	}
+	cache = await makeCache<Image>(params)
 })()
 
 export interface Image extends Model {
@@ -90,7 +98,9 @@ export class ImageRepo {
 
 		const image = await cache.get(id)
 
-		if (!image) return null
+		if (!image) {
+			return null
+		}
 
 		return scaleImage(image, size)
 	}

@@ -12,12 +12,24 @@ const node_fetch_1 = require("node-fetch");
 function fetchJson(url, params) {
     return __awaiter(this, void 0, void 0, function* () {
         var query = Object.keys(params)
-            .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k]))
-            .join('&');
+            .map(k => encodeURIComponent(k) + "=" + encodeURIComponent(params[k]))
+            .join("&");
         // console.log(url + "?" + query)
         const response = yield node_fetch_1.default(url + "?" + query);
         return yield response.json();
     });
 }
 exports.fetchJson = fetchJson;
+function fetchJsonP(url, params) {
+    return __awaiter(this, void 0, void 0, function* () {
+        var query = Object.keys(params)
+            .map(k => encodeURIComponent(k) + "=" + encodeURIComponent(params[k]))
+            .join("&");
+        // console.log(url + "?" + query)
+        const response = yield node_fetch_1.default(url + "?" + query);
+        let text = yield response.text();
+        return JSON.parse(text.replace(/^jQuery[^(]*\((.*)\)$/, "$1"));
+    });
+}
+exports.fetchJsonP = fetchJsonP;
 //# sourceMappingURL=fetch.js.map

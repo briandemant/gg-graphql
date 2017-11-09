@@ -3,7 +3,7 @@ import { Model } from "./model"
 import { ListingRepo } from "./listing"
 import { CacheUtil, makeCache } from "./cacheutil"
 
-let FORCE_REFRESH_ITEMS = 5 * 60 * 60
+let FORCE_REFRESH_ITEMS = 24 * 60 * 60
 
 function fakeUser(id: number): User {
 	return {
@@ -17,18 +17,25 @@ function fakeUser(id: number): User {
 }
 
 async function refreshItemFn(user: User | number, ageInSeconds: number): Promise<User | null> {
-	if (ageInSeconds < 10) {
+	if (ageInSeconds < 5 * 60) {
 		return null
 	}
 
-	if (typeof  user === "number") return fakeUser(user)
+	if (typeof  user === "number") {
+		return fakeUser(user)
+	}
 
 	return null
 }
 
 let cache: CacheUtil<User>
 (async () => {
-	cache = await makeCache<User>("user", refreshItemFn, FORCE_REFRESH_ITEMS)
+	const params = {
+		name: "user",
+		refreshItemFn: refreshItemFn,
+		refreshItemRateInSeconds: FORCE_REFRESH_ITEMS,
+	}
+	cache = await makeCache<User>(params)
 })()
 
 export interface User extends Model {
@@ -46,10 +53,11 @@ export class UserRepo {
 	}
 
 	static async listings(id: number, limit: number) {
-		return (await ListingRepo.search("", 0, id, limit)).results//.map(l => l.id)
+		let x = await ListingRepo.search("", 0, id, limit)
+		return x.results
 	}
 
-	static async saveToCache(user: User): Promise<void> {
+	static saveToCache(user: User) {
 		cache.update(user)
 	}
 }

@@ -11,28 +11,29 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const fetch_1 = require("../fetch");
 const lodash_1 = require("lodash");
 const cacheutil_1 = require("./cacheutil");
-let FORCE_REFRESH_ITEMS = 24 * 60 * 60;
+let FORCE_REFRESH_ITEMS = 7 * 24 * 60 * 60;
 function refreshItemFn(category, ageInSeconds) {
     return __awaiter(this, void 0, void 0, function* () {
         if (ageInSeconds < 60) {
             return null;
         }
         let id;
-        if (typeof category === 'number') {
+        if (typeof category === "number") {
             id = category;
             category = {
                 id: id,
                 level: -1,
-                title: '',
+                title: "",
                 count: 0,
-                slug: '/',
-                title_slug: '',
+                slug: "/",
+                title_slug: "",
                 parents: [],
                 children: [],
                 can_create: false,
                 extra: {
-                    listings: []
-                }
+                    listings: [],
+                    status: "ok",
+                },
             };
         }
         else {
@@ -65,7 +66,7 @@ function refreshItemFn(category, ageInSeconds) {
                 let diff = lodash_1.difference(previousChildren, category.children);
                 // console.log("difference", diff)
                 yield removeChildren(diff);
-                if (category.id == 0) {
+                if (category.id === 0) {
                     category.level = -1;
                 }
                 else {
@@ -97,7 +98,8 @@ function refreshItemFn(category, ageInSeconds) {
         }
         catch (e) {
             console.error(id, category, e);
-            category.status = "error";
+            //
+            category.extra.status = "error";
             return category;
         }
     });
@@ -122,7 +124,12 @@ function rebuildTree() {
     });
 }
 (() => __awaiter(this, void 0, void 0, function* () {
-    cache = yield cacheutil_1.makeCache("category", refreshItemFn, FORCE_REFRESH_ITEMS);
+    let params = {
+        name: "category",
+        refreshItemFn: refreshItemFn,
+        refreshItemRateInSeconds: FORCE_REFRESH_ITEMS,
+    };
+    cache = yield cacheutil_1.makeCache(params);
     rebuildTree().catch((err) => console.log(err));
 }))();
 class CategoryRepo {

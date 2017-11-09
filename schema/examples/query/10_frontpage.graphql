@@ -1,0 +1,30 @@
+{
+	category_roots {
+		title
+		slug
+		count
+	}
+	listing_latest(limit:3) {
+		count
+		results {
+			id
+			title
+			price
+			createdAt
+			image {
+				url
+			}
+		}
+	}
+	listing_front(limit:10) {
+		count
+		results {
+			id
+			title
+			price
+			image {
+				url
+			}
+		}
+	}
+}

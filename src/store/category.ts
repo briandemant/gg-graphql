@@ -3,8 +3,7 @@ import { difference } from "lodash"
 import { Model } from "./model"
 import { CacheUtil, makeCache } from "./cacheutil"
 
-
-let FORCE_REFRESH_ITEMS = 24 * 60 * 60
+let FORCE_REFRESH_ITEMS = 7 * 24 * 60 * 60
 
 export interface Category extends Model {
 	id: number
@@ -16,11 +15,11 @@ export interface Category extends Model {
 	children: number[]
 	parents: number[]
 	can_create: boolean,
-	extra : {
-		listings : number[]
+	extra: {
+		listings: number[],
+		status: "ok" | "error",
 	}
 }
-
 
 async function refreshItemFn(category: Category | number, ageInSeconds: number): Promise<Category | null> {
 	if (ageInSeconds < 60) {
@@ -29,21 +28,22 @@ async function refreshItemFn(category: Category | number, ageInSeconds: number):
 
 	let id
 
-	if (typeof category === 'number') {
+	if (typeof category === "number") {
 		id = category
 		category = {
 			id: id,
 			level: -1,
-			title: '',
+			title: "",
 			count: 0,
-			slug: '/',
-			title_slug: '',
+			slug: "/",
+			title_slug: "",
 			parents: [],
 			children: [],
 			can_create: false,
-			extra : {
-				listings :  []
-			}
+			extra: {
+				listings: [],
+				status: "ok",
+			},
 		} as Category
 	} else {
 		id = category.id
@@ -67,7 +67,10 @@ async function refreshItemFn(category: Category | number, ageInSeconds: number):
 			return category
 		} else {
 			const catInfo = await fetchJson(`https://api.guloggratis.dk/modules/gg_app/category/data`, { id })
-			const childInfo = await fetchJson(`https://api.guloggratis.dk/modules/gulgratis/ajax/ad_creator.fetch_categories_for_select.php`, { parent_categoryid: id })
+			const childInfo = await fetchJson(
+				`https://api.guloggratis.dk/modules/gulgratis/ajax/ad_creator.fetch_categories_for_select.php`,
+				{ parent_categoryid: id },
+			)
 
 			category.title = catInfo.name
 			category.slug = catInfo.GAScreenValue
@@ -81,7 +84,7 @@ async function refreshItemFn(category: Category | number, ageInSeconds: number):
 			// console.log("difference", diff)
 			await removeChildren(diff)
 
-			if (category.id == 0) {
+			if (category.id === 0) {
 				category.level = -1
 			} else {
 				category.level = category.parents.length
@@ -113,7 +116,8 @@ async function refreshItemFn(category: Category | number, ageInSeconds: number):
 		}
 	} catch (e) {
 		console.error(id, category, e)
-		;(category as any).status = "error"
+		//
+		category.extra.status = "error"
 		return category
 	}
 }
@@ -136,13 +140,16 @@ async function rebuildTree() {
 	// cache.get(374).catch((err) => console.log(err))
 }
 
-
 (async () => {
-	cache = await makeCache<Category>("category", refreshItemFn, FORCE_REFRESH_ITEMS)
+	let params = {
+		name: "category",
+		refreshItemFn: refreshItemFn,
+		refreshItemRateInSeconds: FORCE_REFRESH_ITEMS,
+	}
+	cache = await makeCache<Category>(params)
 
 	rebuildTree().catch((err) => console.log(err))
 })()
-
 
 export class CategoryRepo {
 	static async find(id: number): Promise<Category | null> {

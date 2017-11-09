@@ -16,6 +16,7 @@ enum ImageSizeType {
 	SMALL
 }
 
+# The Category model
 type Category {
 	id: Int!
 	title: String!
@@ -29,6 +30,7 @@ type Category {
 	can_create: Boolean
 }
 
+# The Listing model
 type Listing {
 	id: Int!
 	title: String!
@@ -36,22 +38,25 @@ type Listing {
 	price: Int!
 	transaction_type: TransactionType!
 	user: User!
+	createdAt: String!
 	category: Category!
 	images(size: ImageSizeType): [Image!]
+	image(size: ImageSizeType): Image
 	phone: String!
 	address: String
 	zipcode: String
 	city: String
 	country: String
-	extra: ListingExtra
-}
 
-type ListingExtra {
+	# related listings for a listing
 	related(limit:Int): [Listing!]
 }
 
+# list of listings
 type ListingList {
+	# how many listings was found
 	count: Int!
+	# a list of results (Listings)
 	results: [Listing!]
 }
 
@@ -61,12 +66,11 @@ type User {
 	phone: String!
 	has_nemid: Boolean
 	avatar(size: ImageSizeType): Image
-	extra: UserExtra
-}
 
-type UserExtra {
+	# Other listings by this user
 	listings(limit:Int): [Listing!]
 }
+
 
 type Image {
 	id: Int!
@@ -79,20 +83,26 @@ type Image {
 type Query {
 	# lookup one category
 	category(id: Int!): Category
+
+	# list the category roots
 	category_roots: [Category]
-	# --
+
+
+	# lookup one listing
 	listing(id: Int!): Listing
+
+	#  list the latest listings
 	listing_latest(category: Int, limit: Int): ListingList
-	listing_search(
-		query: String
-		category: Int
-		user: Int
-		limit: Int
-	): ListingList
-	# --
+
+	#  list the listings for the frontpage
+	listing_front(limit: Int): ListingList
+
+	#  search for listings
+	listing_search(query: String,category: Int, user: Int, limit: Int): ListingList
+
+	# get info about the user
 	user(id: Int!): User
-	# --
+
+	# get info about an image
 	image(id: Int!, size: ImageSizeType): Image
-	# --
-	errors: [String]
 }
